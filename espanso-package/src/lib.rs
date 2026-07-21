@@ -77,7 +77,7 @@ pub fn get_provider(
             // available to non-authenticated requests), so we check if a "git ls-remote" command
             // is able to access it.
             if matches_known_hosts && !util::git::is_private_repo(git_repo_url) {
-                bail!("could not access repository: {}, make sure it exists and that you have the necessary access rights.", git_repo_url);
+                bail!("could not access repository: {git_repo_url}, make sure it exists and that you have the necessary access rights.");
             }
         }
 

@@ -70,7 +70,7 @@ impl UIRemote for LinuxRemote {
             .icon(&self.notification_icon_path)
             .show()
         {
-            error!("Unable to show notification: {}", error);
+            error!("Unable to show notification: {error}");
         }
     }
 
@@ -112,7 +112,7 @@ impl UIEventLoop for LinuxEventLoop {
                             return Ok(());
                         }
                         Err(error) => {
-                            error!("Unable to block the LinuxEventLoop: {}", error);
+                            error!("Unable to block the LinuxEventLoop: {error}");
                             return Err(error.into());
                         }
                     }

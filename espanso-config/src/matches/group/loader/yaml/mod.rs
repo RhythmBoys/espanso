@@ -168,8 +168,7 @@ pub fn try_convert_into_match(
         Some("capitalize_words") => UpperCasingStyle::CapitalizeWords,
         Some(style) => {
             warnings.push(anyhow!(
-                "unrecognized uppercase_style: {:?}, falling back to the default",
-                style
+                "unrecognized uppercase_style: {style:?}, falling back to the default"
             ));
             TriggerCause::default().uppercase_style
         }

@@ -59,7 +59,7 @@ impl GitPackageProvider {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!("git command exited with non-zero status: {}", stderr);
+            bail!("git command exited with non-zero status: {stderr}");
         }
         Ok(())
     }

@@ -59,7 +59,7 @@ pub fn resolve_evaluation_order<'a>(
     for var_name in &(*eval_order_ref) {
         let node = node_map
             .get(var_name)
-            .ok_or_else(|| anyhow!("could not find dependency node for variable: {}", var_name))?;
+            .ok_or_else(|| anyhow!("could not find dependency node for variable: {var_name}"))?;
         if let Some(var) = node.variable {
             ordered_variables.push(var);
         }

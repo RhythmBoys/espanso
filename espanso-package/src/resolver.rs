@@ -42,7 +42,7 @@ pub fn resolve_package(
         .collect();
 
     if matching_packages.is_empty() {
-        bail!("no package found with name: {}", name);
+        bail!("no package found with name: {name}");
     }
 
     matching_packages.sort_by(|a, b| natord::compare(&a.manifest.version, &b.manifest.version));
