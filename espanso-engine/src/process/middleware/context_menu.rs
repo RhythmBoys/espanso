@@ -34,6 +34,7 @@ const CONTEXT_ITEM_SECURE_INPUT_TRIGGER_WORKAROUND: u32 = 5;
 const CONTEXT_ITEM_OPEN_SEARCH: u32 = 6;
 const CONTEXT_ITEM_SHOW_LOGS: u32 = 7;
 const CONTEXT_ITEM_OPEN_CONFIG_FOLDER: u32 = 8;
+const CONTEXT_ITEM_SETTINGS: u32 = 9;
 
 pub struct ContextMenuMiddleware {
     is_enabled: RefCell<bool>,
@@ -82,6 +83,10 @@ impl Middleware for ContextMenuMiddleware {
                     MenuItem::Simple(SimpleMenuItem {
                         id: CONTEXT_ITEM_RELOAD,
                         label: "Reload config".to_string(),
+                    }),
+                    MenuItem::Simple(SimpleMenuItem {
+                        id: CONTEXT_ITEM_SETTINGS,
+                        label: "Settings…".to_string(),
                     }),
                     MenuItem::Simple(SimpleMenuItem {
                         id: CONTEXT_ITEM_OPEN_CONFIG_FOLDER,
@@ -175,7 +180,11 @@ impl Middleware for ContextMenuMiddleware {
                         ));
                         Event::caused_by(event.source_id, EventType::NOOP)
                     }
-                    9_u32..=u32::MAX => {
+                    CONTEXT_ITEM_SETTINGS => {
+                        dispatch(Event::caused_by(event.source_id, EventType::ShowSettings));
+                        Event::caused_by(event.source_id, EventType::NOOP)
+                    }
+                    10_u32..=u32::MAX => {
                         // Should be unreachable, given there are no other options
                         unreachable!()
                     }
@@ -199,5 +208,53 @@ impl Middleware for ContextMenuMiddleware {
             }
             _ => event,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::input::ContextMenuClickedEvent;
+
+    #[test]
+    fn tray_menu_places_settings_before_open_config_folder() {
+        let middleware = ContextMenuMiddleware::new();
+        let output = middleware.next(Event::caused_by(1, EventType::TrayIconClicked), &mut |_| {});
+        let EventType::ShowContextMenu(menu) = output.etype else {
+            panic!("expected a context menu");
+        };
+        let labels = menu
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                MenuItem::Simple(item) => Some(item.label.as_str()),
+                MenuItem::Sub(_) | MenuItem::Separator => None,
+            })
+            .collect::<Vec<_>>();
+        let settings = labels
+            .iter()
+            .position(|label| *label == "Settings…")
+            .unwrap();
+        let config = labels
+            .iter()
+            .position(|label| *label == "Open config folder")
+            .unwrap();
+        assert!(settings < config);
+    }
+
+    #[test]
+    fn settings_menu_click_dispatches_show_settings() {
+        let middleware = ContextMenuMiddleware::new();
+        let mut dispatched = Vec::new();
+        let output = middleware.next(
+            Event::caused_by(
+                2,
+                EventType::ContextMenuClicked(ContextMenuClickedEvent { context_item_id: 9 }),
+            ),
+            &mut |event| dispatched.push(event),
+        );
+
+        assert!(matches!(output.etype, EventType::NOOP));
+        assert!(matches!(dispatched[0].etype, EventType::ShowSettings));
     }
 }

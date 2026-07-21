@@ -19,6 +19,7 @@
 
 use std::thread::JoinHandle;
 
+use crate::cli::PathsOverrides;
 use crate::path::Paths;
 use anyhow::Result;
 use crossbeam::channel::Receiver;
@@ -38,7 +39,8 @@ use crate::{
                 clipboard_injector::ClipboardInjectorAdapter,
                 context_menu::ContextMenuHandlerAdapter, event_injector::EventInjectorAdapter,
                 icon::IconHandlerAdapter, key_injector::KeyInjectorAdapter,
-                secure_input::SecureInputManagerAdapter, text_ui::TextUIHandlerAdapter,
+                secure_input::SecureInputManagerAdapter, settings::SettingsHandlerAdapter,
+                text_ui::TextUIHandlerAdapter,
             },
             process::middleware::{
                 image_resolve::PathProviderAdapter,
@@ -89,6 +91,7 @@ pub fn initialize_and_spawn(
     use_evdev_backend: bool,
     start_reason: Option<String>,
     ipc_event_receiver: Receiver<EventType>,
+    paths_overrides: PathsOverrides,
 ) -> Result<JoinHandle<ExitMode>> {
     let handle = std::thread::Builder::new()
         .name("engine thread".to_string())
@@ -261,6 +264,7 @@ pub fn initialize_and_spawn(
             let context_menu_adapter = ContextMenuHandlerAdapter::new(&*ui_remote);
             let icon_adapter = IconHandlerAdapter::new(&*ui_remote);
             let secure_input_adapter = SecureInputManagerAdapter::new();
+            let settings_adapter = SettingsHandlerAdapter::new(&paths_overrides);
             let text_ui_adapter = TextUIHandlerAdapter::new(&modulo_text_ui, &paths);
             let dispatcher = espanso_engine::dispatch::default(
                 &event_injector,
@@ -272,6 +276,7 @@ pub fn initialize_and_spawn(
                 &context_menu_adapter,
                 &icon_adapter,
                 &secure_input_adapter,
+                &settings_adapter,
                 &text_ui_adapter,
             );
 

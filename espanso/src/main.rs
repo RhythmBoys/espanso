@@ -71,6 +71,7 @@ static CLI_HANDLERS: LazyLock<Vec<CliModule>> = LazyLock::new(|| {
         cli::modulo::new(),
         cli::env_path::new(),
         cli::service::new(),
+        cli::settings::new(),
         cli::workaround::new(),
         cli::package::new(),
         cli::match_cli::new(),
@@ -142,6 +143,10 @@ fn main() {
             .about("Enable/Disable expansions."))
         .subcommand(SubCommand::with_name("search")
             .about("Open the Espanso's search bar."))
+        .subcommand(SubCommand::with_name("settings")
+            .about("Open Espanso Settings."))
+        .subcommand(SubCommand::with_name("open-config")
+            .about("Open the Espanso configuration folder."))
     )
     .subcommand(SubCommand::with_name("edit")
         .about("Shortcut to open the default text editor to edit config files")
@@ -157,6 +162,7 @@ For example, specifying 'email' is equivalent to 'match/email.yml'."#))
         .about("Start the daemon without spawning a new process."),
     )
     .subcommand(SubCommand::with_name("launcher").setting(AppSettings::Hidden))
+    .subcommand(SubCommand::with_name("settings").setting(AppSettings::Hidden))
     .subcommand(SubCommand::with_name("log").about("Print the daemon logs."))
     .subcommand(
       SubCommand::with_name("stats")
@@ -585,13 +591,36 @@ SubCommand::with_name("install")
 
         if handler.requires_paths || handler.requires_config {
             let force_config_path = get_path_override(&matches, "config_dir", "ESPANSO_CONFIG_DIR");
+            let config_override_source = if matches.value_of("config_dir").is_some() {
+                Some(espanso_settings::ConfigPathSource::Cli)
+            } else if std::env::var_os("ESPANSO_CONFIG_DIR").is_some() {
+                Some(espanso_settings::ConfigPathSource::Environment)
+            } else {
+                None
+            };
+            let location_store_path = crate::path::get_config_location_store_path();
+            let persisted_config_path = if force_config_path.is_none() {
+                match espanso_settings::ConfigLocationStore::new(location_store_path.clone()).load()
+                {
+                    Ok(path) => path,
+                    Err(error) => {
+                        warn!("ignoring invalid persisted configuration location: {error}");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+            let effective_config_path = force_config_path
+                .clone()
+                .or_else(|| persisted_config_path.clone());
             let force_package_path =
                 get_path_override(&matches, "package_dir", "ESPANSO_PACKAGE_DIR");
             let force_runtime_path =
                 get_path_override(&matches, "runtime_dir", "ESPANSO_RUNTIME_DIR");
 
             let paths = crate::path::resolve_paths(
-                force_config_path.as_deref(),
+                effective_config_path.as_deref(),
                 force_package_path.as_deref(),
                 force_runtime_path.as_deref(),
             );
@@ -601,6 +630,14 @@ SubCommand::with_name("install")
                 packages: force_package_path,
                 runtime: force_runtime_path,
             });
+            cli_args.config_path_source = Some(config_override_source.unwrap_or_else(|| {
+                if persisted_config_path.is_some() {
+                    espanso_settings::ConfigPathSource::Persisted
+                } else {
+                    espanso_settings::ConfigPathSource::PlatformDefault
+                }
+            }));
+            cli_args.location_store_path = Some(location_store_path);
 
             info!("reading configs from: {:?}", paths.config.display());
             info!("reading packages from: {:?}", paths.packages.display());

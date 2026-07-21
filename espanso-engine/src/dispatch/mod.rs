@@ -37,6 +37,7 @@ pub use executor::icon_update::IconHandler;
 pub use executor::image_inject::ImageInjector;
 pub use executor::key_inject::KeyInjector;
 pub use executor::secure_input::SecureInputManager;
+pub use executor::settings::SettingsHandler;
 pub use executor::text_inject::{Mode, ModeProvider, TextInjector};
 pub use executor::text_ui::{TextUIExecutor, TextUIHandler};
 
@@ -51,6 +52,7 @@ pub fn default<'a>(
     context_menu_handler: &'a dyn ContextMenuHandler,
     icon_handler: &'a dyn IconHandler,
     secure_input_manager: &'a dyn SecureInputManager,
+    settings_handler: &'a dyn SettingsHandler,
     text_ui_handler: &'a dyn TextUIHandler,
 ) -> impl Dispatcher + 'a {
     default::DefaultDispatcher::new(
@@ -63,6 +65,7 @@ pub fn default<'a>(
         context_menu_handler,
         icon_handler,
         secure_input_manager,
+        settings_handler,
         text_ui_handler,
     )
 }
