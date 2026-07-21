@@ -70,3 +70,4 @@ tarpaulin-report.html
 
 # Agent worktrees
 .worktrees/
+.superpowers/

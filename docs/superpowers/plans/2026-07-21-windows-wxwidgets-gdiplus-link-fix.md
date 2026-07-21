@@ -446,8 +446,8 @@ Use `superpowers:verification-before-completion`. Confirm the local focused test
 git status --short
 git diff --stat origin/dev...HEAD
 git log --oneline origin/dev..HEAD
-git push origin yxq-espanso-settings-ui
-gh pr create --base dev --head yxq-espanso-settings-ui --title "fix: resolve Windows GDI+ link collision" --body "Fixes the Windows LNK2005/LNK1169 failure caused by duplicate wxWidgets and windows-rs GDI+ symbols. Disables only the wxWidgets GDI+ fallback, preserves Direct2D, adds guarded patch tests, and verifies the complete Windows build."
+git push origin yxq-windows-gdiplus-link-fix
+gh pr create --base dev --head yxq-windows-gdiplus-link-fix --title "fix: resolve Windows GDI+ link collision" --body "Fixes the Windows LNK2005/LNK1169 failure caused by duplicate wxWidgets and windows-rs GDI+ symbols. Disables only the wxWidgets GDI+ fallback, preserves Direct2D, adds guarded patch tests, and verifies the complete Windows build."
 ```
 
 Expected: the diff contains the existing Rust 1.97 Clippy fix, approved design and plan documents, the patch helper, `build.rs`, and the Windows workflow change. No unrelated commit or file appears.
@@ -465,7 +465,7 @@ Expected: `linux-x11`, `linux-wayland`, `macos`, and `windows` all report `pass`
 - [ ] **Step 4: Inspect the Windows job for direct link evidence**
 
 ```powershell
-$run = gh run list --branch yxq-espanso-settings-ui --workflow CI --limit 1 --json databaseId | ConvertFrom-Json
+$run = gh run list --branch yxq-windows-gdiplus-link-fix --workflow CI --limit 1 --json databaseId | ConvertFrom-Json
 gh run view $run.databaseId --log | Select-String 'Test wxWidgets GDI\+ patch|Compiling espanso v|Finished `dev` profile|LNK2005|LNK1169'
 ```
 
