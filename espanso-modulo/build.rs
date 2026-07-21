@@ -57,7 +57,10 @@ fn run_nmake(out_wx_dir: &Path, vcvars_path: &Path, target: Option<&str>) {
         .expect("unable to wait for nmake command")
         .success()
     {
-        panic!("nmake {} returned non-zero exit code!", target.unwrap_or("build"));
+        panic!(
+            "nmake {} returned non-zero exit code!",
+            target.unwrap_or("build")
+        );
     }
 }
 

@@ -1,8 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-const ORIGINAL_SETUP_MARKER: &str =
-    "#define wxUSE_GRAPHICS_GDIPLUS wxUSE_GRAPHICS_CONTEXT";
+const ORIGINAL_SETUP_MARKER: &str = "#define wxUSE_GRAPHICS_GDIPLUS wxUSE_GRAPHICS_CONTEXT";
 const PATCHED_SETUP_MARKER: &str = "#define wxUSE_GRAPHICS_GDIPLUS 0";
 const ORIGINAL_SOURCE_MARKER: &str = "#if wxUSE_GRAPHICS_CONTEXT";
 const PATCHED_SOURCE_MARKER: &str = "#if wxUSE_GRAPHICS_GDIPLUS";
