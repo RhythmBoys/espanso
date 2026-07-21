@@ -34,6 +34,7 @@ pub mod modulo;
 pub mod package;
 pub mod path;
 pub mod service;
+pub mod settings;
 pub mod stats;
 pub mod util;
 pub mod workaround;
@@ -84,8 +85,11 @@ pub struct CliModuleArgs {
     pub paths: Option<Paths>,
     pub paths_overrides: Option<PathsOverrides>,
     pub cli_args: Option<ArgMatches>,
+    pub config_path_source: Option<espanso_settings::ConfigPathSource>,
+    pub location_store_path: Option<PathBuf>,
 }
 
+#[derive(Clone, Default)]
 pub struct PathsOverrides {
     pub config: Option<PathBuf>,
     pub runtime: Option<PathBuf>,

@@ -22,7 +22,7 @@ use espanso_ipc::{IPCClient, IPCServer};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum IPCEvent {
     Exit,
     ExitAllProcesses,
@@ -32,14 +32,27 @@ pub enum IPCEvent {
     ToggleRequest,
     OpenSearchBar,
     OpenConfigFolder,
+    OpenSettings,
 
     RequestMatchExpansion(RequestMatchExpansionPayload),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct RequestMatchExpansionPayload {
     pub trigger: Option<String>,
     pub args: HashMap<String, String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IPCEvent;
+
+    #[test]
+    fn open_settings_round_trips_through_json() {
+        let encoded = serde_json::to_string(&IPCEvent::OpenSettings).unwrap();
+        let decoded: IPCEvent = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, IPCEvent::OpenSettings);
+    }
 }
 
 pub fn create_daemon_ipc_server(runtime_dir: &Path) -> Result<impl IPCServer<IPCEvent>> {

@@ -47,9 +47,13 @@ jobs:
             build-essential \
             git \
             libdbus-1-dev \
+            libfontconfig1-dev \
             libssl-dev \
             libwxgtk3.*-dev \
             libx11-dev \
+            libx11-xcb-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
             libxkbcommon-dev \
             libxtst-dev
       - name: Build
@@ -63,8 +67,11 @@ jobs:
             --workspace \
             --exclude espanso-modulo \
             --exclude espanso-ipc \
+            --exclude espanso-settings \
             --no-default-features \
             --features vendored-tls
+          cargo check -p espanso-settings
+          cargo test -p espanso-settings --no-default-features
       - name: Clippy
         run: cargo clippy --all-targets --features=modulo,vendored-tls -- --deny warnings
       - uses: cachix/install-nix-action@v31
@@ -96,8 +103,14 @@ jobs:
             build-essential \
             git \
             libdbus-1-dev \
+            libfontconfig1-dev \
             libssl-dev \
             libwxgtk3.*-dev \
+            libwayland-dev \
+            libx11-dev \
+            libx11-xcb-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
             libxkbcommon-dev \
             wl-clipboard
       - name: Build
@@ -111,8 +124,11 @@ jobs:
             --workspace \
             --exclude espanso-modulo \
             --exclude espanso-ipc \
+            --exclude espanso-settings \
             --no-default-features \
             --features vendored-tls,wayland
+          cargo check -p espanso-settings
+          cargo test -p espanso-settings --no-default-features
       - name: Clippy
         run: cargo clippy --features=modulo,vendored-tls,wayland -- --deny warnings
       # leaving this nix because is quite fast. macOS in the other hand takes
@@ -140,7 +156,10 @@ jobs:
           rustup target add x86_64-apple-darwin
           cargo build --target x86_64-apple-darwin
       - name: Test
-        run: cargo test --workspace
+        run: |
+          cargo test --workspace --exclude espanso-settings
+          cargo check -p espanso-settings
+          cargo test -p espanso-settings --no-default-features
       - name: Clippy
         run: |
           cargo clippy --target=aarch64-apple-darwin -- --deny warnings
@@ -162,5 +181,9 @@ jobs:
       - name: Build
         run: |
           cargo build
+      - name: Test Settings
+        run: |
+          cargo check -p espanso-settings
+          cargo test -p espanso-settings --no-default-features
       - name: Clippy
         run: cargo clippy -- --deny warnings

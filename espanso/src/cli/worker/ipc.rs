@@ -66,6 +66,7 @@ pub fn initialize_and_spawn(
                     IPCEvent::OpenConfigFolder => {
                         send_event(&event_notify, EventType::ShowConfigFolder)
                     }
+                    IPCEvent::OpenSettings => send_event(&event_notify, EventType::ShowSettings),
                     IPCEvent::RequestMatchExpansion(payload) => send_event(
                         &event_notify,
                         EventType::MatchExecRequest(MatchExecRequestEvent {

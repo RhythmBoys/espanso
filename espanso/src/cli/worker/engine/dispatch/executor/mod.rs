@@ -23,6 +23,7 @@ pub mod event_injector;
 pub mod icon;
 pub mod key_injector;
 pub mod secure_input;
+pub mod settings;
 pub mod text_ui;
 
 pub trait InjectParamsProvider {
