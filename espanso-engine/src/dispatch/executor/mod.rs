@@ -23,5 +23,6 @@ pub mod icon_update;
 pub mod image_inject;
 pub mod key_inject;
 pub mod secure_input;
+pub mod settings;
 pub mod text_inject;
 pub mod text_ui;

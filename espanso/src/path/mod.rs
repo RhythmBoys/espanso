@@ -189,9 +189,13 @@ fn get_default_config_dir() -> Option<PathBuf> {
     None
 }
 
-fn get_default_config_path() -> PathBuf {
+pub(crate) fn get_default_config_path() -> PathBuf {
     let config_dir = dirs::config_dir().expect("unable to obtain dirs::config_dir()");
     config_dir.join("espanso")
+}
+
+pub(crate) fn get_config_location_store_path() -> PathBuf {
+    get_default_config_path().with_file_name("espanso-settings-location.json")
 }
 
 // Due to the original behavior of the dirs crate, espanso placed the config

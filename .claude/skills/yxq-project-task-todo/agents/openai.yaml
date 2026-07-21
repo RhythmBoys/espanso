@@ -1,0 +1,4 @@
+interface:
+  display_name: "YXQ Project Task Todo"
+  short_description: "管理项目任务队列并安全同步 NAS Obsidian 待办"
+  default_prompt: "Use $yxq-project-task-todo to create, execute, or safely sync this project todo queue."

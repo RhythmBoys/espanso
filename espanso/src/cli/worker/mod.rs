@@ -63,6 +63,7 @@ fn worker_main(args: CliModuleArgs) -> i32 {
     prevent_running_as_root_on_macos();
 
     let paths = args.paths.expect("missing paths in worker main");
+    let paths_overrides = args.paths_overrides.unwrap_or_default();
     let cli_args = args.cli_args.expect("missing cli_args in worker main");
 
     // When restarted, the daemon passes the reason why the worker was restarted (config_change, etc)
@@ -139,6 +140,7 @@ fn worker_main(args: CliModuleArgs) -> i32 {
         use_evdev_backend,
         start_reason,
         ipc_event_receiver,
+        paths_overrides,
     )
     .expect("unable to initialize engine");
 
