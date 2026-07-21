@@ -67,3 +67,6 @@ tarpaulin-report.html
 
 # direnv
 .direnv/
+
+# Agent worktrees
+.worktrees/
