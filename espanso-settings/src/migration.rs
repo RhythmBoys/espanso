@@ -129,7 +129,15 @@ pub(crate) fn copy_tree(source: &Path, staging: &Path) -> Result<()> {
                 fs::create_dir_all(parent)?;
             }
             fs::copy(entry.path(), &target)?;
-            File::open(&target)?.sync_all()?;
+            // The handle must be writable: on Windows `sync_all` maps to
+            // `FlushFileBuffers`, which requires GENERIC_WRITE and fails with
+            // `ERROR_ACCESS_DENIED` on a read-only handle.
+            File::options()
+                .write(true)
+                .open(&target)
+                .with_context(|| format!("unable to reopen {} to flush it", target.display()))?
+                .sync_all()
+                .with_context(|| format!("unable to flush {} to disk", target.display()))?;
         }
     }
     Ok(())
