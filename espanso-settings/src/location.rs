@@ -141,6 +141,7 @@ fn validate_directory(path: &Path) -> Result<PathBuf> {
     if !path.is_dir() {
         bail!("configuration directory does not exist or is not a directory");
     }
-    path.canonicalize()
-        .with_context(|| "unable to canonicalize configuration directory")
+    // dunce, not `Path::canonicalize`: a `\\?\` verbatim path breaks the glob
+    // patterns espanso-config builds. See `migration::canonicalize_destination`.
+    dunce::canonicalize(path).with_context(|| "unable to canonicalize configuration directory")
 }

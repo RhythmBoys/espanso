@@ -12,6 +12,7 @@ ui = ["dep:rfd", "dep:slint"]
 [dependencies]
 anyhow.workspace = true
 atomicwrites = "0.4.4"
+dunce = "1.0.1"
 espanso-config = { path = "../espanso-config" }
 espanso-ipc = { path = "../espanso-ipc" }
 fs_extra.workspace = true

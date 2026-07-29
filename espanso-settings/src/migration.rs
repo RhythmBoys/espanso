@@ -47,8 +47,7 @@ impl MigrationService {
             bail!("source configuration directory does not exist");
         }
 
-        let source = source
-            .canonicalize()
+        let source = dunce::canonicalize(source)
             .with_context(|| "unable to canonicalize source directory")?;
         let destination = canonicalize_destination(destination)?;
         if source == destination
@@ -143,17 +142,23 @@ pub(crate) fn copy_tree(source: &Path, staging: &Path) -> Result<()> {
     Ok(())
 }
 
+// `dunce::canonicalize` rather than `Path::canonicalize`: the latter returns a
+// `\\?\` verbatim path on Windows, and these paths are handed to
+// `espanso_config::load`, whose glob patterns contain `..`. `glob` 0.3 computes
+// its root offset by subtracting two `PathBuf` lengths, and only the verbatim
+// one collapses `..`, so the subtraction underflows and panics. espanso-config
+// uses dunce for the same reason.
 fn canonicalize_destination(destination: &Path) -> Result<PathBuf> {
     if destination.exists() {
-        return destination
-            .canonicalize()
+        return dunce::canonicalize(destination)
             .with_context(|| "unable to canonicalize destination directory");
     }
-    let parent = destination
-        .parent()
-        .context("destination directory has no parent")?
-        .canonicalize()
-        .with_context(|| "destination parent does not exist")?;
+    let parent = dunce::canonicalize(
+        destination
+            .parent()
+            .context("destination directory has no parent")?,
+    )
+    .with_context(|| "destination parent does not exist")?;
     let name = destination
         .file_name()
         .context("destination directory has no name")?;

@@ -12,6 +12,25 @@
   - 遗留风险：`fs::copy` 在 Windows 会连只读属性一起复制。若用户的配置文件本身是只读的，重开写句柄仍会 EACCES。现在错误会指名具体文件，不再是裸报错。
 - **关键词**: Windows, sync_all, FlushFileBuffers, GENERIC_WRITE, ERROR_ACCESS_DENIED, os error 5, fsync, anyhow context
 
+### [2026-07-29] 别把 `\\?\` verbatim 路径交给 espanso-config
+
+- **问题**: `espanso_validator_rejects_non_fatal_yaml_errors_before_publish` 在 Windows release 构建下 panic：`end byte index 18446744073709551613 is out of bounds for string of length 170`。
+- **根因**: `espanso-settings` 用了 `std::path::Path::canonicalize()`，Windows 上返回 `\\?\C:\...` verbatim 路径。espanso-config 的 `STANDARD_INCLUDES` 是 `"../match/**/[!_]*.yml"`，含 `..`。glob 0.3.0 这样算根偏移：
+  ```rust
+  let rest = components.map(|s| s.as_os_str()).collect::<PathBuf>();      // 空起点，不折叠 ..
+  let normalized_pattern = Path::new(pattern).iter().collect::<PathBuf>(); // verbatim 起点，折叠 ..
+  let root_len = normalized_pattern.len() - rest.len();                    // 下溢 3 字节
+  Some(Path::new(&pattern[..root_len]))                                    // panic
+  ```
+  `PathBuf::push` 只在 self 带 verbatim 前缀时移除 `..`，两边长度因此差 3（`\..`）。release 构建整数溢出回绕成 `usize::MAX - 2` = 18446744073709551613，与报错数字精确吻合。
+- **解决**: 全部改用 `dunce::canonicalize`（espanso-config 早就这么做，dunce 存在的意义就是不返回 verbatim 路径）。`tests/location.rs` 里对 `Path::canonicalize()` 的断言同步改掉，并加了「解析结果不得以 `\\?\` 开头」的守卫。
+- **预防**:
+  - **本仓库任何要交给 `espanso_config::load` 的路径，一律 `dunce::canonicalize`，不要用 `Path::canonicalize`。**
+  - 断言别用被测代码换过的那个 API 去反推期望值——`assert_eq!(resolved, x.canonicalize())` 把 verbatim 形式固化成了契约，改用 dunce 时才暴露。
+  - 残留风险：路径 ≥260 字符时 dunce 仍会返回 verbatim 形式。
+  - 只在 Windows + release 复现：debug 下整数溢出会 panic 在减法处，报错完全不同。
+- **关键词**: glob 0.3.0, verbatim path, `\\?\`, dunce, canonicalize, root_len underflow, release overflow wrap
+
 ### [2026-07-29] `ci.yml` 绿不等于发布工作流绿
 
 - **问题**: 上述 bug 由 `dev-release.yml` 暴露，但 `ci.yml` 的 windows job 同样跑 `cargo test -p espanso-settings --no-default-features`，本应更早红。
