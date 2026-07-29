@@ -1,0 +1,300 @@
+name: Tag Release
+
+# Push a `v*` tag and this builds every platform and publishes the artifacts to
+# a GitHub Release.
+#
+# Differs from `create-release-draft.yml` (kept as-is, it is the upstream file):
+#   - triggered by the tag push itself instead of a manual dispatch from `dev`
+#   - the release name comes from the tag, not from espanso/Cargo.toml
+#   - no SignPath code signing, so the Windows artifacts are read straight out
+#     of `target/windows` rather than out of the signing step's output directory
+#   - the macOS artifact is uploaded (unsigned - see the release notes)
+#   - the release is built as a draft and only flipped to public once every
+#     platform succeeded, so a failed build never leaves a half-populated
+#     public release behind
+
+on:
+  push:
+    tags:
+      - "v*"
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tag-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: prepare
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    outputs:
+      espanso_version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@main
+      - name: Resolve version from tag
+        id: version
+        run: |
+          TAG_VERSION="${{ github.ref_name }}"
+          echo "version=${TAG_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Releasing ${TAG_VERSION}"
+
+          # The Windows installer embeds the version from espanso/Cargo.toml
+          # (see scripts/build_windows_installer.ps1), not the tag. Warn loudly
+          # when the two disagree - the release would be titled after the tag
+          # while the installed app reports the manifest version.
+          CARGO_VERSION="v$(grep '^version' espanso/Cargo.toml | awk -F '"' '{ print $2 }')"
+          if [ "${TAG_VERSION}" != "${CARGO_VERSION}" ]; then
+            echo "::warning::Tag ${TAG_VERSION} does not match espanso/Cargo.toml (${CARGO_VERSION}). The Windows installer will report ${CARGO_VERSION}."
+          fi
+
+  create-release:
+    name: create-release
+    needs: ["prepare"]
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@main
+      - name: Create draft release
+        # gh release create docs: https://cli.github.com/manual/gh_release_create
+        # Created as a draft; the `publish` job makes it public once every
+        # platform has uploaded successfully.
+        run: |
+          # Quoted heredoc: nothing inside is expanded by the shell, so the
+          # backticks and markdown survive verbatim.
+          cat > release-notes.md <<'NOTES'
+          Automatically released by CI.
+
+          These binaries are **not code signed**:
+
+          - Windows: SmartScreen will warn on first run.
+          - macOS: the app is neither signed nor notarized. Gatekeeper blocks it
+            when launched from /Applications. Open it once via right-click ->
+            Open, or clear the quarantine flag:
+            `xattr -dr com.apple.quarantine /Applications/Espanso.app`
+          NOTES
+
+          gh release create ${{ needs.prepare.outputs.espanso_version }} \
+            --title ${{ needs.prepare.outputs.espanso_version }} \
+            --draft \
+            --verify-tag \
+            --target ${{ github.sha }} \
+            --notes-file release-notes.md
+
+  windows:
+    needs: ["prepare", "create-release"]
+    runs-on: windows-latest
+    continue-on-error: false
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/cache@main
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@main
+      - name: Print target version
+        run: |
+          echo Using version ${{ needs.prepare.outputs.espanso_version }}
+      - name: Build
+        run: |
+          cargo build \
+            -p espanso \
+            --no-default-features \
+            --features modulo,native-tls \
+            --release
+      - name: Test
+        run: |
+          cargo test \
+            --release \
+            --workspace \
+            --exclude espanso-modulo \
+            --exclude espanso-ipc \
+            --no-default-features \
+            --features native-tls
+      - name: Build resources
+        shell: pwsh
+        run: |
+          $env:EXEC_PATH = "target\release\espanso.exe"
+          scripts\build_windows_resources.ps1
+      - name: Download and install Inno Setup (missing in Windows Server 2025)
+        run: choco install innosetup --no-progress
+      - name: Build installer
+        shell: pwsh
+        run: |
+          Install-Module -Name 'PSTOML' -Force
+          scripts\build_windows_installer.ps1
+      - name: Build portable mode archive
+        shell: pwsh
+        run: |
+          scripts\build_windows_portable.ps1
+      - uses: actions/upload-artifact@main
+        name: upload-unsigned-artifact
+        with:
+          name: Windows Artifacts
+          path: |
+            target/windows/Espanso-Win-Installer-x86_64.exe
+            target/windows/Espanso-Win-Portable-x86_64.zip
+      - name: Upload artifacts to Github Releases
+        # Paths are under target/windows because there is no signing step to
+        # drop rewritten copies into the working directory.
+        run: |
+          gh release upload ${{ needs.prepare.outputs.espanso_version }} \
+            target/windows/Espanso-Win-Installer-x86_64.exe \
+            target/windows/Espanso-Win-Portable-x86_64.zip
+
+  linux-x11:
+    needs: ["prepare", "create-release"]
+    runs-on: ubuntu-latest
+    continue-on-error: false
+
+    steps:
+      - uses: actions/cache@main
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@main
+      - name: Print target version
+        run: |
+          echo Using version ${{ needs.prepare.outputs.espanso_version }}
+      - name: Build docker image
+        run: |
+          sudo docker build -t espanso-ubuntu . -f .github/scripts/Dockerfile
+      - name: Build AppImage
+        run: |
+          sudo docker run --rm -v "$(pwd):/shared" espanso-ubuntu espanso/.github/scripts/ubuntu/build_appimage.sh
+      - uses: actions/upload-artifact@main
+        name: upload-unsigned-artifact
+        with:
+          name: Linux X11 AppImage Artifact
+          path: |
+            Espanso-X11.AppImage
+      - name: Upload artifacts to Github Releases
+        run: |
+          gh release upload ${{ needs.prepare.outputs.espanso_version }} Espanso-X11.AppImage
+
+  linux-deb:
+    needs: ["prepare", "create-release"]
+    runs-on: ubuntu-latest
+    continue-on-error: false
+
+    steps:
+      - uses: actions/cache@main
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@main
+      - name: Print target version
+        run: |
+          echo Using version ${{ needs.prepare.outputs.espanso_version }}
+      - name: Build docker image
+        run: |
+          sudo docker build -t espanso-ubuntu . -f .github/scripts/Dockerfile
+      - name: Build Deb packages
+        run: |
+          sudo docker run --rm -v "$(pwd):/shared" espanso-ubuntu espanso/.github/scripts/ubuntu/build_deb.sh
+      - uses: actions/upload-artifact@main
+        name: upload-unsigned-artifact
+        with:
+          name: Linux Deb Artifacts
+          path: |
+            espanso-debian-x11-amd64.deb
+            espanso-debian-wayland-amd64.deb
+      - name: Upload artifacts to Github Releases
+        run: |
+          gh release upload ${{ needs.prepare.outputs.espanso_version }} espanso-debian-x11-amd64.deb espanso-debian-wayland-amd64.deb
+
+  macos:
+    needs: ["prepare", "create-release"]
+    runs-on: macos-latest
+    continue-on-error: false
+
+    steps:
+      - uses: actions/cache@main
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@main
+      - name: Print target version
+        run: |
+          echo Using version ${{ needs.prepare.outputs.espanso_version }}
+      - name: Test
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo test \
+            -p espanso \
+            --target x86_64-apple-darwin \
+            --no-default-features \
+            --features native-tls,modulo
+          cargo test \
+            -p espanso \
+            --target aarch64-apple-darwin \
+            --no-default-features \
+            --features native-tls,modulo
+      - name: Build
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo build \
+            -p espanso \
+            --target x86_64-apple-darwin \
+            --release \
+            --no-default-features \
+            --features native-tls,modulo
+          cargo build \
+            -p espanso \
+            --target aarch64-apple-darwin \
+            --release \
+            --no-default-features \
+            --features native-tls,modulo
+          bash ./scripts/create_bundle.sh
+      - name: Create ZIP archive
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent target/mac/Espanso.app Espanso-Mac-Universal.zip
+      - uses: actions/upload-artifact@main
+        name: upload-unsigned-artifact
+        with:
+          name: macOS Universal Artifact
+          path: |
+            Espanso-Mac-Universal.zip
+      - name: Upload artifacts to Github Releases
+        # Unsigned and un-notarized: Gatekeeper blocks this when launched from
+        # /Applications. The release notes tell users how to get around it.
+        run: |
+          gh release upload ${{ needs.prepare.outputs.espanso_version }} Espanso-Mac-Universal.zip
+
+  publish:
+    name: publish
+    needs: ["prepare", "windows", "linux-x11", "linux-deb", "macos"]
+    runs-on: ubuntu-latest
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@main
+      - name: Publish the release
+        run: |
+          gh release edit ${{ needs.prepare.outputs.espanso_version }} --draft=false
+          echo "Published ${{ needs.prepare.outputs.espanso_version }}"
