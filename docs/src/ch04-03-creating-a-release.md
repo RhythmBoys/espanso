@@ -29,10 +29,18 @@ This is the automated path. Nothing to click.
    - creates the release as a **draft**,
    - builds and uploads Windows, Linux (X11 + deb) and macOS artifacts in
      parallel,
-   - flips the release to public only once **all four** platforms succeeded.
+   - flips the release to public once **Windows and macOS** have succeeded.
 
-   A failed platform therefore leaves a draft you can inspect or delete, never a
-   half-populated public release.
+   Only Windows and macOS gate publication. The `publish` job still waits for
+   the Linux jobs to finish, so their artifacts are attached whenever they do
+   succeed — but a Linux failure no longer holds the release back. The run is
+   still marked failed and a warning names the missing platforms; re-running
+   those jobs attaches their artifacts to the existing release.
+
+   If Windows or macOS fails, the release stays a **draft**. Drafts are only
+   visible to people with write access on the repository — if the Releases page
+   looks empty after a tag push, check for a draft there before assuming
+   nothing was created.
 
 4) Share the news — make an announcement in the `espanso` discord.
 

@@ -9,9 +9,9 @@ name: Tag Release
 #   - no SignPath code signing, so the Windows artifacts are read straight out
 #     of `target/windows` rather than out of the signing step's output directory
 #   - the macOS artifact is uploaded (unsigned - see the release notes)
-#   - the release is built as a draft and only flipped to public once every
-#     platform succeeded, so a failed build never leaves a half-populated
-#     public release behind
+#   - the release is built as a draft and flipped to public once Windows and
+#     macOS have succeeded. A Linux failure does not block publication; its
+#     artifacts are simply missing and the run is still marked failed.
 
 on:
   push:
@@ -289,12 +289,28 @@ jobs:
 
   publish:
     name: publish
+    # Depends on every platform so it waits for the Linux jobs to settle and
+    # their artifacts land when they do succeed - but Windows and macOS are the
+    # only ones that gate publication. `!cancelled()` (rather than `always()`)
+    # lets the job run after a failed dependency while still respecting a
+    # cancelled run.
     needs: ["prepare", "windows", "linux-x11", "linux-deb", "macos"]
+    if: ${{ !cancelled() && needs.windows.result == 'success' && needs.macos.result == 'success' }}
     runs-on: ubuntu-latest
     continue-on-error: false
     steps:
       - uses: actions/checkout@main
+      - name: Report platform results
+        run: |
+          echo "windows:   ${{ needs.windows.result }}"
+          echo "macos:     ${{ needs.macos.result }}"
+          echo "linux-x11: ${{ needs.linux-x11.result }}"
+          echo "linux-deb: ${{ needs.linux-deb.result }}"
       - name: Publish the release
         run: |
           gh release edit ${{ needs.prepare.outputs.espanso_version }} --draft=false
           echo "Published ${{ needs.prepare.outputs.espanso_version }}"
+      - name: Note missing platforms
+        if: ${{ needs.linux-x11.result != 'success' || needs.linux-deb.result != 'success' }}
+        run: |
+          echo "::warning::Published without a complete set of Linux artifacts (linux-x11=${{ needs.linux-x11.result }}, linux-deb=${{ needs.linux-deb.result }}). Re-run those jobs to attach them to the existing release."
