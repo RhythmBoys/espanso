@@ -244,7 +244,7 @@ impl EVDEVInjector {
                 std::thread::sleep(std::time::Duration::from_millis(50));
             }
 
-            bail!("timed-out while waiting for key release: {}", code);
+            bail!("timed-out while waiting for key release: {code}");
         }
         // else Keyboard provider not available,
         Ok(())

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust 2021、Slint 1.17.1、slint-build 1.17.1、rfd 0.17.2、serde/serde_json、serde_norway、tempdir、fs_extra、现有 espanso-config/espanso-ipc。
 
-**Implementation status (2026-07-20):** 原始三项功能已实现；自动化服务测试、严格 Clippy、格式检查、主程序 IPC 测试和 Linux ARM64 链接构建已通过。Windows/macOS/Linux 原生 UI、IME、DPI、主题和安装包仍需在对应平台执行发布前人工验收。下方清单保留原始细粒度范围，未实现的增强项不作虚假勾选。
+**Implementation status (2026-07-21):** 原始三项功能已实现；Rust 1.97 Linux ARM64 环境下，CI 等价的 workspace Clippy、格式检查、workspace 测试、Settings 检查与测试均已通过。Windows/macOS/Linux 原生 UI、IME、DPI、主题和安装包仍需在对应平台执行发布前人工验收。下方清单保留原始细粒度范围，未实现的增强项不作虚假勾选。
 
 ## Global Constraints
 

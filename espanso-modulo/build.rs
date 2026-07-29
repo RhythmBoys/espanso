@@ -17,10 +17,11 @@
  * along with espanso.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-#[cfg(not(target_os = "windows"))]
-use std::path::Path;
+#[cfg(target_os = "windows")]
+#[path = "build_support/wx_gdiplus.rs"]
+mod wx_gdiplus;
 
 #[cfg(not(target_os = "linux"))]
 const WX_WIDGETS_ARCHIVE_NAME: &str = "wxWidgets-3.1.5-patched-version-3.zip";
@@ -29,9 +30,42 @@ const WX_WIDGETS_ARCHIVE_NAME: &str = "wxWidgets-3.1.5-patched-version-3.zip";
 const WX_WIDGETS_BUILD_OUT_DIR_ENV_NAME: &str = "WX_WIDGETS_BUILD_OUT_DIR";
 
 #[cfg(target_os = "windows")]
-fn build_native() {
-    use std::process::Command;
+fn run_nmake(out_wx_dir: &Path, vcvars_path: &Path, target: Option<&str>) {
+    let mut command = std::process::Command::new("cmd");
+    command
+        .current_dir(out_wx_dir.join("build").join("msw"))
+        .arg("/k")
+        .arg(vcvars_path)
+        .args([
+            "&",
+            "nmake",
+            "/f",
+            "makefile.vc",
+            "BUILD=release",
+            "TARGET_CPU=X64",
+        ]);
+    if let Some(target) = target {
+        command.arg(target);
+    }
+    let mut handle = command
+        .args(["&", "exit"])
+        .spawn()
+        .expect("failed to execute nmake");
 
+    if !handle
+        .wait()
+        .expect("unable to wait for nmake command")
+        .success()
+    {
+        panic!(
+            "nmake {} returned non-zero exit code!",
+            target.unwrap_or("build")
+        );
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn build_native() {
     let project_dir =
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("missing CARGO_MANIFEST_DIR"));
     let wx_archive = project_dir.join("vendor").join(WX_WIDGETS_ARCHIVE_NAME);
@@ -47,8 +81,8 @@ fn build_native() {
     };
     let out_wx_dir = out_dir.join("wx");
 
-    if !out_wx_dir.is_dir() {
-        // Extract the wxWidgets archive
+    let extracted = !out_wx_dir.is_dir();
+    if extracted {
         let wx_archive =
             std::fs::File::open(&wx_archive).expect("unable to open wxWidgets source archive");
         let mut archive =
@@ -56,14 +90,20 @@ fn build_native() {
         archive
             .extract(&out_wx_dir)
             .expect("unable to extract wxWidgets source dir");
+    }
 
+    let patch_changed = wx_gdiplus::patch_tree(&out_wx_dir)
+        .unwrap_or_else(|error| panic!("unable to disable the wxWidgets GDI+ backend: {error}"));
+    let compiled_dir = out_wx_dir.join("build").join("msw").join("vc_mswu_x64");
+    let needs_build = extracted || patch_changed || !compiled_dir.is_dir();
+
+    if needs_build {
         let tool = cc::Build::new().get_compiler();
         assert!(
             tool.is_like_msvc(),
             "The tool found is not of the MSVC family, did you install Visual Studio?"
         );
 
-        // Compile wxWidgets
         let mut vcvars_path = None;
         let mut current_root = tool.path();
         while let Some(parent) = current_root.parent() {
@@ -81,46 +121,17 @@ fn build_native() {
 
         let vcvars_path = vcvars_path.expect("unable to find vcvars64.bat file");
         println!("vsvars folder: {}", vcvars_path.display());
-        let mut handle = Command::new("cmd")
-            .current_dir(
-                out_wx_dir
-                    .join("build")
-                    .join("msw")
-                    .to_string_lossy()
-                    .to_string(),
-            )
-            .args([
-                "/k",
-                &vcvars_path.to_string_lossy(),
-                "&",
-                "nmake",
-                "/f",
-                "makefile.vc",
-                "BUILD=release",
-                "TARGET_CPU=X64",
-                "&",
-                "exit",
-            ])
-            .spawn()
-            .expect("failed to execute nmake");
-        if !handle
-            .wait()
-            .expect("unable to wait for nmake command")
-            .success()
-        {
-            panic!("nmake returned non-zero exit code!");
+
+        if patch_changed && !extracted {
+            run_nmake(&out_wx_dir, &vcvars_path, Some("clean"));
         }
+        run_nmake(&out_wx_dir, &vcvars_path, None);
     }
 
     println!("wxWidgets will be compiled into: {}", out_wx_dir.display());
 
     // Make sure wxWidgets is compiled
-    if !out_wx_dir
-        .join("build")
-        .join("msw")
-        .join("vc_mswu_x64")
-        .is_dir()
-    {
+    if !compiled_dir.is_dir() {
         panic!("wxWidgets is not compiled correctly, missing 'build/msw/vc_mswu_x64' directory")
     }
 
@@ -359,7 +370,7 @@ fn convert_fat_libraries_to_arm(lib_dir: &Path) {
 
 #[cfg(not(target_os = "windows"))]
 fn get_cpp_flags(wx_config_path: &Path) -> Vec<String> {
-    println!("using {}", &wx_config_path.display());
+    println!("using {}", wx_config_path.display());
     let config_output = std::process::Command::new(wx_config_path)
         .arg("--cxxflags")
         .output()

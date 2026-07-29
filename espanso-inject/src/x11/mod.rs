@@ -36,7 +36,7 @@ impl X11ProxyInjector {
         let default_injector = match default::X11DefaultInjector::new() {
             Ok(injector) => Some(injector),
             Err(err) => {
-                error!("X11DefaultInjector could not be initialized: {:?}", err);
+                error!("X11DefaultInjector could not be initialized: {err:?}");
                 warn!("falling back to xdotool injector");
                 None
             }
@@ -45,7 +45,7 @@ impl X11ProxyInjector {
         let xdotool_injector = match xdotool::X11XDOToolInjector::new() {
             Ok(injector) => Some(injector),
             Err(err) => {
-                error!("X11XDOToolInjector could not be initialized: {:?}", err);
+                error!("X11XDOToolInjector could not be initialized: {err:?}");
                 None
             }
         };

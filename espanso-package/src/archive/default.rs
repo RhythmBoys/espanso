@@ -99,7 +99,7 @@ impl Archiver for DefaultArchiver {
         let target_dir = self.package_dir.join(name);
 
         if !target_dir.is_dir() {
-            bail!("package '{}' not found", name);
+            bail!("package '{name}' not found");
         }
 
         let manifest_path = target_dir.join("_manifest.yml");
@@ -142,7 +142,7 @@ impl Archiver for DefaultArchiver {
         let target_dir = self.package_dir.join(name);
 
         if !target_dir.is_dir() {
-            bail!("package {} not found", name);
+            bail!("package {name} not found");
         }
 
         std::fs::remove_dir_all(&target_dir).context("unable to remove package directory")?;

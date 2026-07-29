@@ -43,18 +43,6 @@ pub struct RequestMatchExpansionPayload {
     pub args: HashMap<String, String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::IPCEvent;
-
-    #[test]
-    fn open_settings_round_trips_through_json() {
-        let encoded = serde_json::to_string(&IPCEvent::OpenSettings).unwrap();
-        let decoded: IPCEvent = serde_json::from_str(&encoded).unwrap();
-        assert_eq!(decoded, IPCEvent::OpenSettings);
-    }
-}
-
 pub fn create_daemon_ipc_server(runtime_dir: &Path) -> Result<impl IPCServer<IPCEvent>> {
     create_ipc_server(runtime_dir, "daemonv2")
 }
@@ -74,4 +62,16 @@ fn create_ipc_server(runtime_dir: &Path, name: &str) -> Result<impl IPCServer<IP
 fn create_ipc_client(runtime_dir: &Path, target_process: &str) -> Result<impl IPCClient<IPCEvent>> {
     let client = espanso_ipc::client(&format!("espanso{target_process}"), runtime_dir)?;
     Ok(client)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IPCEvent;
+
+    #[test]
+    fn open_settings_round_trips_through_json() {
+        let encoded = serde_json::to_string(&IPCEvent::OpenSettings).unwrap();
+        let decoded: IPCEvent = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, IPCEvent::OpenSettings);
+    }
 }

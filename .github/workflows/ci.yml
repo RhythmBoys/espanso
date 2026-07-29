@@ -178,6 +178,13 @@ jobs:
       - uses: actions/checkout@main
       - name: Format
         run: cargo fmt --all -- --check
+      - name: Test wxWidgets GDI+ patch
+        run: |
+          test_binary="${RUNNER_TEMP}/wx-gdiplus-patch-tests.exe"
+          rustc --edition 2021 --test \
+            espanso-modulo/build_support/wx_gdiplus.rs \
+            -o "$test_binary"
+          "$test_binary"
       - name: Build
         run: |
           cargo build
