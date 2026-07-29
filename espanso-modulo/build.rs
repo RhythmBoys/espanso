@@ -93,7 +93,7 @@ fn build_native() {
     }
 
     let patch_changed = wx_gdiplus::patch_tree(&out_wx_dir)
-        .unwrap_or_else(|error| panic!("unable to patch wxWidgets GDI+ backend: {error}"));
+        .unwrap_or_else(|error| panic!("unable to disable the wxWidgets GDI+ backend: {error}"));
     let compiled_dir = out_wx_dir.join("build").join("msw").join("vc_mswu_x64");
     let needs_build = extracted || patch_changed || !compiled_dir.is_dir();
 

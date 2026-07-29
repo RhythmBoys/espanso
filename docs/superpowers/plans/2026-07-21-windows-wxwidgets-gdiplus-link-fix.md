@@ -11,7 +11,10 @@
 ## Global Constraints
 
 - Preserve Slint 1.17.1 and its current renderer features.
-- Preserve wxWidgets Direct2D graphics-context support.
+- ~~Preserve wxWidgets Direct2D graphics-context support.~~ Withdrawn on
+  2026-07-29: wxWidgets 3.1.5 cannot link with `wxUSE_GRAPHICS_GDIPLUS 0` while
+  `wxUSE_GRAPHICS_CONTEXT` stays enabled. See the design document's
+  "Revision 2026-07-29" section.
 - Support x86_64 Windows 10 and Windows 11; do not add pre-Direct2D compatibility.
 - Do not change Linux or macOS build behavior.
 - Do not add `/FORCE:MULTIPLE` or another linker-error suppression flag.

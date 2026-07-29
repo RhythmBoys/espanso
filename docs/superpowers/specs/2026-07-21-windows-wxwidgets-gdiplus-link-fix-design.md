@@ -96,6 +96,55 @@ The Windows CI job must complete these checks in order:
 The final link command must produce `espanso.exe` without `LNK2005` or
 `LNK1169`.
 
+## Revision 2026-07-29 — Direct2D cannot be retained on wxWidgets 3.1.5
+
+The decision above shipped and removed `LNK2005`/`LNK1169`, but the link then
+failed with a new error:
+
+```
+wxmsw31u_core.lib(corelib_graphcmn.obj) : error LNK2019: unresolved external
+symbol "public: static class wxGraphicsRenderer * __cdecl
+wxGraphicsRenderer::GetDefaultRenderer(void)"
+```
+
+The premise that Direct2D survives `wxUSE_GRAPHICS_GDIPLUS 0` is wrong for the
+vendored archive:
+
+- `src/msw/graphics.cpp` is wrapped in `#if wxUSE_GRAPHICS_GDIPLUS` and is the
+  only MSW translation unit that defines
+  `wxGraphicsRenderer::GetDefaultRenderer()`.
+- `src/msw/graphicsd2d.cpp` defines `GetDirect2DRenderer()` only; it never
+  supplies the default renderer.
+- `src/common/graphcmn.cpp` still compiles while `wxUSE_GRAPHICS_CONTEXT` is 1
+  and calls `GetDefaultRenderer()` in eleven places.
+
+wxWidgets added the Direct2D fallback for that setting only after 3.1.5, so the
+combination "graphics context on, GDI+ off" does not link here.
+
+### Revised decision
+
+Disable the whole graphics-context subsystem in `include/wx/msw/setup.h`:
+
+1. `wxUSE_GRAPHICS_CONTEXT` from `1` to `0`. `wxUSE_GRAPHICS_GDIPLUS` and
+   `wxUSE_GRAPHICS_DIRECT2D` are both defined as `wxUSE_GRAPHICS_CONTEXT`, so
+   they follow automatically and no source guard has to be edited.
+2. `wxUSE_ACTIVITYINDICATOR` from `1` to `0`, because `include/wx/chkconf.h`
+   raises `#error "wxUSE_ACTIVITYINDICATOR requires wxGraphicsContext"`
+   otherwise.
+
+This is a configuration wxWidgets supports, so every graphics-context consumer
+compiles out consistently instead of leaving dangling references. The previous
+`src/msw/gdiplus.cpp` guard patch is dropped; that file already guards itself
+with `#if wxUSE_GRAPHICS_CONTEXT`.
+
+The superseded goal "retain wxWidgets Direct2D support" is withdrawn. Espanso's
+wxWidgets dialogs use no graphics-context feature: `espanso-modulo/src` contains
+no `wxGraphicsContext`, `wxGCDC`, `wxActivityIndicator`, or `wxRichToolTip`, and
+`wxStaticBitmap` resolves to the native MSW control rather than the
+graphics-context-based generic one. The remaining in-tree consumers
+(`src/generic/richtooltipg.cpp`, `src/generic/statbmpg.cpp`) keep their calls
+behind `#if wxUSE_GRAPHICS_CONTEXT` and provide plain-GDI fallbacks.
+
 ## Risks
 
 Disabling the GDI+ backend removes the graphics-context fallback used on
