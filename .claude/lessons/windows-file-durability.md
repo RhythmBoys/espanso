@@ -31,6 +31,23 @@
   - 只在 Windows + release 复现：debug 下整数溢出会 panic 在减法处，报错完全不同。
 - **关键词**: glob 0.3.0, verbatim path, `\\?\`, dunce, canonicalize, root_len underflow, release overflow wrap
 
+### [2026-07-29] 文件锁竞争的错误码不跨平台统一
+
+- **问题**: `only_one_settings_instance_can_hold_the_runtime_lock` 在 Windows 报 `The process cannot access the file because another process has locked a portion of the file. (os error 33)`，第二次 `try_acquire` 返回 `Err` 而不是预期的 `Ok(None)`。
+- **根因**: `single_instance.rs` 用 `error.kind() == ErrorKind::WouldBlock` 判断"锁已被占用"。Unix 的 flock 返回 `EWOULDBLOCK`（确实映射为 `WouldBlock`），Windows 的 `LockFileEx` + `LOCKFILE_FAIL_IMMEDIATELY` 返回 `ERROR_LOCK_VIOLATION`（33），而 std 不把它映射为 `WouldBlock`，于是 guard 不匹配、错误穿透。
+- **解决**: 改用 fs2 文档指定的方式比较 `error.raw_os_error() == fs2::lock_contended_error().raw_os_error()`（保留 `WouldBlock` 分支作冗余）。`try_lock_exclusive` 的文档原文就是 "returns an error if the file is currently locked (see `lock_contended_error`)"。
+- **预防**:
+  - **不要用 `io::ErrorKind` 判断平台相关的失败原因**。std 的 `decode_error_kind` 映射表是不完整且平台特定的。库若提供了「哨兵错误」构造函数（如 `lock_contended_error()`），用它。
+  - 参照物：`espanso/src/lock.rs` 用的是 `try_lock_exclusive().is_ok()`，绕开了该问题（代价是把真实 IO 错误也当成"已被锁"）。
+- **关键词**: fs2, LockFileEx, ERROR_LOCK_VIOLATION, os error 33, ErrorKind::WouldBlock, lock_contended_error
+
+### [2026-07-29] espanso-settings 整个 crate 从未在 Windows 上跑过
+
+- **现象**: 连续三轮 CI，每轮暴露一个此前从未触发的 Windows 专属缺陷（`sync_all` 只读句柄 → glob verbatim 路径 → 文件锁错误码），三者互不相关，且都在 `espanso-settings`。
+- **判断**: 不是巧合。这个 crate 的测试此前只在 Linux/macOS 验证过；`ci.yml` 的 windows job 虽然有 `cargo test -p espanso-settings --no-default-features`，但这些用例显然从未在该平台绿过。
+- **预防**: 新增跨平台 crate 时，**首次提交前就要在每个目标平台跑完整测试套件**，而不是靠 CI 一轮抓一个——每轮往返成本极高（Windows job 含 wxWidgets 构建）。本地 Windows 一次性跑 `cargo test -p espanso-settings --no-default-features` 可在一次内暴露全部。
+- **关键词**: 跨平台验证, 平台覆盖缺口, CI 往返成本
+
 ### [2026-07-29] `ci.yml` 绿不等于发布工作流绿
 
 - **问题**: 上述 bug 由 `dev-release.yml` 暴露，但 `ci.yml` 的 windows job 同样跑 `cargo test -p espanso-settings --no-default-features`，本应更早红。

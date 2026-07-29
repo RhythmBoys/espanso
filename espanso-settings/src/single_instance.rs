@@ -36,7 +36,16 @@ impl SettingsInstanceGuard {
             .open(runtime_dir.join("espanso-settings.lock"))?;
         match FileExt::try_lock_exclusive(&file) {
             Ok(()) => Ok(Some(Self { file })),
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(None),
+            // A held lock is not reported uniformly: Unix gives `WouldBlock`,
+            // Windows gives `ERROR_LOCK_VIOLATION` (os error 33), which std
+            // does not map to `WouldBlock`. fs2 documents
+            // `lock_contended_error()` as the portable way to recognize it.
+            Err(error)
+                if error.kind() == std::io::ErrorKind::WouldBlock
+                    || error.raw_os_error() == fs2::lock_contended_error().raw_os_error() =>
+            {
+                Ok(None)
+            }
             Err(error) => Err(error.into()),
         }
     }
