@@ -1958,6 +1958,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "atomicwrites",
+ "dunce",
  "espanso-config",
  "espanso-ipc",
  "fs2",
