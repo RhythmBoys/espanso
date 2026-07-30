@@ -21,10 +21,10 @@ pub enum ConfigPathSource {
 impl ConfigPathSource {
     pub const fn display_name(self) -> &'static str {
         match self {
-            Self::Cli => "命令行覆盖",
-            Self::Environment => "环境变量覆盖",
-            Self::Persisted => "自定义目录",
-            Self::PlatformDefault => "系统默认",
+            Self::Cli => "command-line override",
+            Self::Environment => "environment override",
+            Self::Persisted => "custom directory",
+            Self::PlatformDefault => "platform default",
         }
     }
 

@@ -39,8 +39,8 @@ fn precedence_is_cli_then_environment_then_persisted_then_default() {
 }
 
 /// The resolved directory is fed to `espanso_config::load`, whose glob patterns
-/// contain `..`. A `\\?\` verbatim path — what `Path::canonicalize` returns on
-/// Windows — makes `glob` 0.3 panic, so the contract is the dunce form.
+/// contain `..`. A `\\?\` verbatim path (what `Path::canonicalize` returns on
+/// Windows) makes `glob` 0.3 panic, so the contract is the dunce form.
 fn assert_resolved(actual: &Path, expected: &Path) {
     assert_eq!(actual, dunce::canonicalize(expected).unwrap());
     #[cfg(windows)]

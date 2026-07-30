@@ -29,7 +29,7 @@ pub fn run(options: SettingsLaunchOptions) -> Result<()> {
     window.set_source_label(options.config_override_source.display_name().into());
     window.set_can_change_location(options.config_override_source.allows_persistent_change());
     if let Some(error) = load_error {
-        window.set_error_message(format!("无法载入 UI 管理的规则；原文件未被修改：{error}").into());
+        window.set_error_message(format!("Cannot load matches; file unchanged: {error}").into());
     }
     refresh_rows(&window, &model.borrow());
 
@@ -111,7 +111,7 @@ fn bind_match_editor(
             window.set_selected_id(selected.id.into());
             window.set_trigger_text(selected.trigger.into());
             window.set_replacement_text(selected.replace.into());
-            window.set_status_message("已载入规则，可编辑后保存".into());
+            window.set_status_message("Match loaded; edit it and save".into());
         }
     });
 
@@ -121,7 +121,7 @@ fn bind_match_editor(
             window.set_selected_id(SharedString::default());
             window.set_trigger_text(SharedString::default());
             window.set_replacement_text(SharedString::default());
-            window.set_status_message("正在创建新规则".into());
+            window.set_status_message("Creating a new match".into());
         }
     });
 
@@ -154,7 +154,7 @@ fn bind_match_editor(
                 save_model.borrow_mut().reduce(ModelMessage::Saved);
                 window.set_selected_id(id.into());
                 window.set_error_message(SharedString::default());
-                window.set_status_message("规则已安全保存，Espanso 将自动重新加载".into());
+                window.set_status_message("Match saved; Espanso will reload automatically".into());
                 refresh_rows(&window, &save_model.borrow());
             }
             Err(error) => {
@@ -175,7 +175,7 @@ fn bind_match_editor(
                 window.set_trigger_text(SharedString::default());
                 window.set_replacement_text(SharedString::default());
                 window.set_undo_visible(true);
-                window.set_status_message("规则已移出列表；保存其他规则前可撤销".into());
+                window.set_status_message("Match removed; you can undo before saving".into());
                 refresh_rows(&window, &delete_model.borrow());
             }
         }
@@ -188,7 +188,7 @@ fn bind_match_editor(
         if let Some(window) = weak.upgrade() {
             if effect == ModelEffect::MatchesChanged {
                 window.set_undo_visible(false);
-                window.set_status_message("删除已撤销".into());
+                window.set_status_message("Deletion undone".into());
                 refresh_rows(&window, &undo_model.borrow());
             }
         }
@@ -206,7 +206,7 @@ fn bind_match_editor(
                 commit_model.borrow_mut().reduce(ModelMessage::Saved);
                 window.set_undo_visible(false);
                 window.set_error_message(SharedString::default());
-                window.set_status_message("删除已安全保存".into());
+                window.set_status_message("Deletion saved safely".into());
             }
             Err(error) => window.set_error_message(error.to_string().into()),
         }
@@ -237,7 +237,7 @@ fn bind_location(window: &crate::SettingsWindow, options: SettingsLaunchOptions)
                     window.set_selected_path(path_text(&selected));
                     window.set_migration_summary(
                         format!(
-                            "将复制 {} 个文件（{} 字节）。旧目录会保留。",
+                            "Will copy {} file(s) ({} bytes). The old directory will be kept.",
                             plan.file_count, plan.byte_count
                         )
                         .into(),
@@ -260,7 +260,7 @@ fn bind_location(window: &crate::SettingsWindow, options: SettingsLaunchOptions)
         };
         let destination = std::path::PathBuf::from(window.get_selected_path().to_string());
         window.set_migration_ready(false);
-        window.set_status_message("正在检查并复制配置…".into());
+        window.set_status_message("Validating and copying the configuration...".into());
         let source = migration_source.clone();
         let store_path = store_path.clone();
         let weak = window.as_weak();
@@ -273,12 +273,12 @@ fn bind_location(window: &crate::SettingsWindow, options: SettingsLaunchOptions)
                 Ok(()) => {
                     window.set_config_path(path_text(&destination));
                     window.set_status_message(
-                        "迁移完成；旧目录已保留。请重启 Espanso 以使用新目录。".into(),
+                        "Migration complete; old directory kept. Restart Espanso.".into(),
                     );
                     window.set_error_message(SharedString::default());
                 }
                 Err(error) => {
-                    window.set_error_message(format!("迁移失败，当前目录未改变：{error}").into());
+                    window.set_error_message(format!("Migration failed: {error}").into());
                 }
             });
         });

@@ -21,7 +21,7 @@ export component SettingsWindow inherits Window {
     in-out property <string> selected-path;
     in-out property <string> migration-summary;
     in-out property <bool> migration-ready: false;
-    in-out property <string> status-message: "就绪";
+    in-out property <string> status-message: "Ready";
     in-out property <string> error-message;
     in-out property <bool> confirm-discard-visible: false;
     in-out property <bool> undo-visible: false;
@@ -57,7 +57,7 @@ export component SettingsWindow inherits Window {
             color: #172033;
         }
         Text {
-            text: "当前配置：" + root.config-path + "  ·  " + root.source-label;
+            text: "Config: " + root.config-path + "  |  " + root.source-label;
             color: #526078;
             overflow: elide;
         }
@@ -81,12 +81,12 @@ export component SettingsWindow inherits Window {
         HorizontalBox {
             spacing: 8px;
             Button {
-                text: "设置";
+                text: "Settings";
                 primary: root.active-tab == 0;
                 clicked => { root.request-tab-switch(0); }
             }
             Button {
-                text: "配置";
+                text: "Configuration";
                 primary: root.active-tab == 1;
                 clicked => { root.request-tab-switch(1); }
             }
@@ -103,12 +103,12 @@ export component SettingsWindow inherits Window {
             HorizontalBox {
                 padding: 8px;
                 Text {
-                    text: "有未保存更改，确定放弃并切换页面吗？";
+                    text: "You have unsaved changes. Discard them and switch tabs?";
                     vertical-alignment: center;
                     horizontal-stretch: 1;
                 }
-                Button { text: "继续编辑"; clicked => { root.cancel-discard(); } }
-                Button { text: "放弃更改"; clicked => { root.confirm-discard(); } }
+                Button { text: "Keep editing"; clicked => { root.cancel-discard(); } }
+                Button { text: "Discard changes"; clicked => { root.confirm-discard(); } }
             }
         }
 
@@ -123,32 +123,32 @@ export component SettingsWindow inherits Window {
                 VerticalBox {
                     padding: 18px;
                     spacing: 12px;
-                    Text { text: "配置目录"; font-size: 20px; font-weight: 600; color: #172033; }
+                    Text { text: "Configuration directory"; font-size: 20px; font-weight: 600; color: #172033; }
                     Text {
-                        text: "选择新目录后会先预检，再复制、验证并切换。旧目录不会被删除。";
+                        text: "Choosing a new directory runs a preflight check first, then copies, validates and switches to it. The old directory is left in place.";
                         color: #526078;
                         wrap: word-wrap;
                     }
                     LineEdit { text: root.config-path; read-only: true; }
                     HorizontalBox {
                         spacing: 8px;
-                        Button { text: "打开当前目录"; clicked => { root.open-config(); } }
+                        Button { text: "Open current directory"; clicked => { root.open-config(); } }
                         Button {
-                            text: "选择新目录…";
+                            text: "Choose new directory...";
                             enabled: root.can-change-location;
                             clicked => { root.choose-folder(); }
                         }
                     }
                     if !root.can-change-location: Text {
-                        text: "当前由命令行或环境变量覆盖路径，不能永久切换。";
+                        text: "The path is currently overridden by the command line or an environment variable, so it cannot be changed permanently.";
                         color: #a15c00;
                     }
                     if root.selected-path != "": VerticalBox {
                         spacing: 8px;
-                        Text { text: "目标目录：" + root.selected-path; color: #172033; }
+                        Text { text: "Target directory: " + root.selected-path; color: #172033; }
                         Text { text: root.migration-summary; color: #526078; wrap: word-wrap; }
                         Button {
-                            text: "复制并切换";
+                            text: "Copy and switch";
                             enabled: root.migration-ready;
                             clicked => { root.migrate(); }
                         }
@@ -172,12 +172,12 @@ export component SettingsWindow inherits Window {
                     HorizontalBox {
                         LineEdit {
                             text <=> root.filter-text;
-                            placeholder-text: "搜索触发词或替换内容";
+                            placeholder-text: "Search triggers or replacement text";
                             horizontal-stretch: 1;
                         }
-                        Button { text: "搜索"; clicked => { root.apply-filter(root.filter-text); } }
+                        Button { text: "Search"; clicked => { root.apply-filter(root.filter-text); } }
                     }
-                    Button { text: "新增规则"; clicked => { root.new-match(); } }
+                    Button { text: "New match"; clicked => { root.new-match(); } }
                     ScrollView {
                         vertical-stretch: 1;
                         VerticalBox {
@@ -193,8 +193,8 @@ export component SettingsWindow inherits Window {
                                         Text { text: row.trigger; font-weight: 600; color: #172033; }
                                         Text { text: row.preview; color: #69758a; overflow: elide; }
                                     }
-                                    Button { text: "编辑"; clicked => { root.select-match(row.id); } }
-                                    Button { text: "删除"; clicked => { root.delete-match(row.id); } }
+                                    Button { text: "Edit"; clicked => { root.select-match(row.id); } }
+                                    Button { text: "Delete"; clicked => { root.delete-match(row.id); } }
                                 }
                             }
                         }
@@ -210,24 +210,24 @@ export component SettingsWindow inherits Window {
                 VerticalBox {
                     padding: 16px;
                     spacing: 8px;
-                    Text { text: root.selected-id == "" ? "新建规则" : "编辑规则"; font-size: 20px; font-weight: 600; }
-                    Text { text: "触发文本"; color: #526078; }
+                    Text { text: root.selected-id == "" ? "New match" : "Edit match"; font-size: 20px; font-weight: 600; }
+                    Text { text: "Trigger text"; color: #526078; }
                     LineEdit {
                         text <=> root.trigger-text;
                         placeholder-text: ":hello";
                         edited => { root.draft-changed(); }
                     }
-                    Text { text: "替换后的长文本"; color: #526078; }
+                    Text { text: "Replacement text"; color: #526078; }
                     TextEdit {
                         text <=> root.replacement-text;
                         vertical-stretch: 1;
                         edited => { root.draft-changed(); }
                     }
                     HorizontalBox {
-                        Text { text: "支持多行、emoji 与中日韩字符"; color: #69758a; horizontal-stretch: 1; }
-                        if root.undo-visible: Button { text: "撤销删除"; clicked => { root.undo-delete(); } }
-                        if root.undo-visible: Button { text: "保存删除"; clicked => { root.commit-deletion(); } }
-                        Button { text: "保存规则"; primary: true; clicked => { root.save-match(); } }
+                        Text { text: "Supports multiple lines, emoji and CJK characters"; color: #69758a; horizontal-stretch: 1; }
+                        if root.undo-visible: Button { text: "Undo delete"; clicked => { root.undo-delete(); } }
+                        if root.undo-visible: Button { text: "Save deletion"; clicked => { root.commit-deletion(); } }
+                        Button { text: "Save match"; primary: true; clicked => { root.save-match(); } }
                     }
                 }
             }
