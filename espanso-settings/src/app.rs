@@ -5,7 +5,8 @@ use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::{
     ConfigLocationStore, EspansoConfigValidator, MatchRepository, MigrationService, ModelEffect,
-    ModelMessage, SettingsLaunchOptions, SettingsModel, SettingsTab, UiMatch, UiMatchRepository,
+    ModelMessage, ScaffoldService, SettingsLaunchOptions, SettingsModel, SettingsTab, UiMatch,
+    UiMatchRepository,
 };
 
 pub fn run(options: SettingsLaunchOptions) -> Result<()> {
@@ -225,6 +226,49 @@ fn bind_match_editor(
 }
 
 fn bind_location(window: &crate::SettingsWindow, options: SettingsLaunchOptions) {
+    let weak = window.as_weak();
+    let browse_config = options.paths.config.clone();
+    let browse_store_path = options.location_store_path.clone();
+    let templates = options.templates;
+    window.on_browse_config(move || {
+        let Some(selected) = rfd::FileDialog::new()
+            .set_directory(&browse_config)
+            .pick_folder()
+        else {
+            return;
+        };
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        window.set_status_message("Generating the default configuration...".into());
+        let result = ScaffoldService::preflight(&browse_config, &selected).and_then(|plan| {
+            ScaffoldService::execute(&plan, &templates, &EspansoConfigValidator)?;
+            ConfigLocationStore::new(browse_store_path.clone()).save_atomic(&plan.destination)?;
+            Ok(plan.destination)
+        });
+        match result {
+            Ok(destination) => {
+                window.set_config_path(path_text(&destination));
+                // The migration panel targets the same directory picker; leaving
+                // it populated would offer to copy into a directory that is no
+                // longer empty.
+                window.set_selected_path(SharedString::default());
+                window.set_migration_summary(SharedString::default());
+                window.set_migration_ready(false);
+                window.set_error_message(SharedString::default());
+                window.set_status_message(
+                    "Default configuration created; switched over. Restart Espanso.".into(),
+                );
+            }
+            Err(error) => {
+                window.set_status_message("Ready".into());
+                window.set_error_message(
+                    format!("Cannot use that directory: {error}; nothing was written.").into(),
+                );
+            }
+        }
+    });
+
     let weak = window.as_weak();
     let current_config = options.paths.config.clone();
     window.on_choose_folder(move || {

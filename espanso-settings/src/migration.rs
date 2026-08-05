@@ -93,7 +93,7 @@ impl MigrationService {
         if !plan.conflicts.is_empty() {
             bail!("migration contains unsupported symbolic links or reparse points");
         }
-        let staging = staging_path(&plan.destination)?;
+        let staging = staging_path(&plan.destination, "espanso-migration")?;
         if staging.exists() {
             bail!("migration staging directory already exists");
         }
@@ -148,7 +148,7 @@ pub(crate) fn copy_tree(source: &Path, staging: &Path) -> Result<()> {
 // its root offset by subtracting two `PathBuf` lengths, and only the verbatim
 // one collapses `..`, so the subtraction underflows and panics. espanso-config
 // uses dunce for the same reason.
-fn canonicalize_destination(destination: &Path) -> Result<PathBuf> {
+pub(crate) fn canonicalize_destination(destination: &Path) -> Result<PathBuf> {
     if destination.exists() {
         return dunce::canonicalize(destination)
             .with_context(|| "unable to canonicalize destination directory");
@@ -165,7 +165,7 @@ fn canonicalize_destination(destination: &Path) -> Result<PathBuf> {
     Ok(parent.join(name))
 }
 
-fn staging_path(destination: &Path) -> Result<PathBuf> {
+pub(crate) fn staging_path(destination: &Path, kind: &str) -> Result<PathBuf> {
     let parent = destination
         .parent()
         .context("destination directory has no parent")?;
@@ -174,8 +174,5 @@ fn staging_path(destination: &Path) -> Result<PathBuf> {
         .context("destination directory has no name")?
         .to_string_lossy();
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    Ok(parent.join(format!(
-        "{name}.espanso-migration-{}-{nonce}",
-        std::process::id()
-    )))
+    Ok(parent.join(format!("{name}.{kind}-{}-{nonce}", std::process::id())))
 }
