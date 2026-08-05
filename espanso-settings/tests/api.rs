@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use espanso_settings::{ConfigPathSource, SettingsLaunchOptions, SettingsPaths};
+use espanso_settings::{ConfigPathSource, ConfigTemplates, SettingsLaunchOptions, SettingsPaths};
 
 #[test]
 fn launch_options_are_constructible_without_opening_a_window() {
@@ -12,6 +12,10 @@ fn launch_options_are_constructible_without_opening_a_window() {
         },
         location_store_path: PathBuf::from("/bootstrap/settings-location.json"),
         config_override_source: ConfigPathSource::PlatformDefault,
+        templates: ConfigTemplates {
+            default_yml: String::new(),
+            base_yml: "matches: []\n".to_string(),
+        },
     };
 
     assert_eq!(options.paths.config, PathBuf::from("/config"));

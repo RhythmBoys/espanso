@@ -24,6 +24,10 @@ fn settings_main(args: CliModuleArgs) -> i32 {
         config_override_source: args
             .config_path_source
             .unwrap_or(espanso_settings::ConfigPathSource::PlatformDefault),
+        templates: espanso_settings::ConfigTemplates {
+            default_yml: crate::config::DEFAULT_CONFIG_FILE_CONTENT.to_string(),
+            base_yml: crate::config::DEFAULT_MATCH_FILE_CONTENT.to_string(),
+        },
     };
 
     if let Err(error) = espanso_settings::run(options) {

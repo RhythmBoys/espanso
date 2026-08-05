@@ -26,8 +26,8 @@ use espanso_config::{
 use log::{error, info, warn};
 use std::path::Path;
 
-const DEFAULT_CONFIG_FILE_CONTENT: &str = include_str!("./res/config/default.yml");
-const DEFAULT_MATCH_FILE_CONTENT: &str = include_str!("./res/config/base.yml");
+pub const DEFAULT_CONFIG_FILE_CONTENT: &str = include_str!("./res/config/default.yml");
+pub const DEFAULT_MATCH_FILE_CONTENT: &str = include_str!("./res/config/base.yml");
 
 pub fn populate_default_config(config_dir: &Path) -> Result<()> {
     if !config_dir.is_dir() {

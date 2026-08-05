@@ -2,6 +2,7 @@ mod location;
 mod matches;
 mod migration;
 mod model;
+mod scaffold;
 mod single_instance;
 
 #[cfg(feature = "ui")]
@@ -16,6 +17,7 @@ pub use location::{
 pub use matches::{MatchRepository, UiMatch, UiMatchRepository};
 pub use migration::{ConfigValidator, EspansoConfigValidator, MigrationPlan, MigrationService};
 pub use model::{ModelEffect, ModelMessage, SettingsModel, SettingsTab};
+pub use scaffold::{ConfigTemplates, ScaffoldPlan, ScaffoldService};
 pub use single_instance::SettingsInstanceGuard;
 
 use std::path::PathBuf;
@@ -32,6 +34,7 @@ pub struct SettingsLaunchOptions {
     pub paths: SettingsPaths,
     pub location_store_path: PathBuf,
     pub config_override_source: ConfigPathSource,
+    pub templates: ConfigTemplates,
 }
 
 #[cfg(feature = "ui")]

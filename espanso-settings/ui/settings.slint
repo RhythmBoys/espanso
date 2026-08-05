@@ -35,6 +35,7 @@ export component SettingsWindow inherits Window {
     callback confirm-discard();
     callback cancel-discard();
     callback draft-changed();
+    callback browse-config();
     callback choose-folder();
     callback migrate();
     callback open-config();
@@ -129,7 +130,24 @@ export component SettingsWindow inherits Window {
                         color: #526078;
                         wrap: word-wrap;
                     }
-                    LineEdit { text: root.config-path; read-only: true; }
+                    HorizontalBox {
+                        spacing: 8px;
+                        LineEdit {
+                            text: root.config-path;
+                            read-only: true;
+                            horizontal-stretch: 1;
+                        }
+                        Button {
+                            text: "...";
+                            enabled: root.can-change-location;
+                            clicked => { root.browse-config(); }
+                        }
+                    }
+                    Text {
+                        text: "Use ... to pick an empty folder; Espanso generates a fresh default configuration in it and switches over.";
+                        color: #526078;
+                        wrap: word-wrap;
+                    }
                     HorizontalBox {
                         spacing: 8px;
                         Button { text: "Open current directory"; clicked => { root.open-config(); } }
