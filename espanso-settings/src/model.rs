@@ -1,4 +1,4 @@
-use crate::UiMatch;
+use crate::{ExternalMatch, UiMatch};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SettingsTab {
@@ -34,6 +34,11 @@ pub struct SettingsModel {
     dirty: bool,
     filter: String,
     matches: Vec<UiMatch>,
+    /// Matches from files Settings does not own. Kept in a separate list rather
+    /// than mixed into `matches` so that no save path can reach them: saving
+    /// only ever walks `matches`, so copying a foreign file into `ui.yml` is not
+    /// something the code can do by accident.
+    external: Vec<ExternalMatch>,
     deleted: Option<(usize, UiMatch)>,
 }
 
@@ -56,6 +61,14 @@ impl SettingsModel {
         self.dirty = false;
     }
 
+    pub fn external(&self) -> &[ExternalMatch] {
+        &self.external
+    }
+
+    pub fn set_external(&mut self, external: Vec<ExternalMatch>) {
+        self.external = external;
+    }
+
     pub fn filtered_matches(&self) -> Vec<&UiMatch> {
         let filter = self.filter.to_lowercase();
         self.matches
@@ -64,6 +77,19 @@ impl SettingsModel {
                 filter.is_empty()
                     || item.trigger.to_lowercase().contains(&filter)
                     || item.replace.to_lowercase().contains(&filter)
+            })
+            .collect()
+    }
+
+    pub fn filtered_external(&self) -> Vec<&ExternalMatch> {
+        let filter = self.filter.to_lowercase();
+        self.external
+            .iter()
+            .filter(|item| {
+                filter.is_empty()
+                    || item.trigger.to_lowercase().contains(&filter)
+                    || item.preview.to_lowercase().contains(&filter)
+                    || item.source_label.to_lowercase().contains(&filter)
             })
             .collect()
     }
