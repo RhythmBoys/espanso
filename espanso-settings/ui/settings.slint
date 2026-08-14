@@ -4,6 +4,11 @@ export struct MatchRow {
     id: string,
     trigger: string,
     preview: string,
+    // Empty for matches Settings owns; the file path for everything else.
+    source-path: string,
+    source-label: string,
+    note: string,
+    editable: bool,
 }
 
 export component SettingsWindow inherits Window {
@@ -43,6 +48,7 @@ export component SettingsWindow inherits Window {
     callback select-match(string);
     callback save-match();
     callback delete-match(string);
+    callback open-match-file(string);
     callback undo-delete();
     callback commit-deletion();
     callback apply-filter(string);
@@ -144,7 +150,7 @@ export component SettingsWindow inherits Window {
                         }
                     }
                     Text {
-                        text: "Use ... to pick an empty folder; Espanso generates a fresh default configuration in it and switches over.";
+                        text: "Use ... to choose a configuration folder. An existing Espanso configuration is adopted as-is, without changing a single file in it; an empty folder gets a fresh default configuration generated in it.";
                         color: #526078;
                         wrap: word-wrap;
                     }
@@ -202,7 +208,7 @@ export component SettingsWindow inherits Window {
                             spacing: 6px;
                             for row in root.match-rows: Rectangle {
                                 min-height: 58px;
-                                background: #f8f9fc;
+                                background: row.editable ? #f8f9fc : #f2f4f8;
                                 border-radius: 5px;
                                 HorizontalBox {
                                     padding: 8px;
@@ -210,9 +216,16 @@ export component SettingsWindow inherits Window {
                                         horizontal-stretch: 1;
                                         Text { text: row.trigger; font-weight: 600; color: #172033; }
                                         Text { text: row.preview; color: #69758a; overflow: elide; }
+                                        if !row.editable: Text {
+                                            text: row.source-label + " · " + row.note;
+                                            color: #8a6a1f;
+                                            font-size: 12px;
+                                            overflow: elide;
+                                        }
                                     }
-                                    Button { text: "Edit"; clicked => { root.select-match(row.id); } }
-                                    Button { text: "Delete"; clicked => { root.delete-match(row.id); } }
+                                    if row.editable: Button { text: "Edit"; clicked => { root.select-match(row.id); } }
+                                    if row.editable: Button { text: "Delete"; clicked => { root.delete-match(row.id); } }
+                                    if !row.editable: Button { text: "Open file"; clicked => { root.open-match-file(row.source-path); } }
                                 }
                             }
                         }

@@ -131,9 +131,10 @@ fn build_native() {
     println!("wxWidgets will be compiled into: {}", out_wx_dir.display());
 
     // Make sure wxWidgets is compiled
-    if !compiled_dir.is_dir() {
-        panic!("wxWidgets is not compiled correctly, missing 'build/msw/vc_mswu_x64' directory")
-    }
+    assert!(
+        compiled_dir.is_dir(),
+        "wxWidgets is not compiled correctly, missing 'build/msw/vc_mswu_x64' directory"
+    );
 
     let wx_include_dir = out_wx_dir.join("include");
     let wx_include_msvc_dir = wx_include_dir.join("msvc");

@@ -1,3 +1,5 @@
+mod adopt;
+mod inventory;
 mod location;
 mod matches;
 mod migration;
@@ -11,6 +13,8 @@ mod app;
 #[cfg(feature = "ui")]
 slint::include_modules!();
 
+pub use adopt::{AdoptPlan, AdoptService, ConfigFolderPlan};
+pub use inventory::{scan_external_matches, ExternalMatch};
 pub use location::{
     resolve_config_location, ConfigLocationStore, ConfigPathSource, ResolvedConfigLocation,
 };
