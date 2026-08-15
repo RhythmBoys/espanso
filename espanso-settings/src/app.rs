@@ -9,9 +9,10 @@ use anyhow::{Context, Result};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::{
-    scan_external_matches, AdoptPlan, AdoptService, ConfigFolderPlan, ConfigLocationStore,
-    EspansoConfigValidator, MatchRepository, MigrationService, ModelEffect, ModelMessage,
-    ScaffoldService, SettingsLaunchOptions, SettingsModel, SettingsTab, UiMatch, UiMatchRepository,
+    scan_external_matches, AdoptPlan, AdoptService, BackupService, ConfigLocationStore,
+    EspansoConfigValidator, ImportPlan, MatchRepository, MigrationService, ModelEffect,
+    ModelMessage, ScaffoldService, SettingsLaunchOptions, SettingsModel, SettingsTab, UiMatch,
+    UiMatchRepository,
 };
 
 pub fn run(options: SettingsLaunchOptions) -> Result<()> {
@@ -277,12 +278,16 @@ fn bind_location(
     repository: Rc<RefCell<UiMatchRepository>>,
     active_config: Rc<RefCell<PathBuf>>,
 ) {
+    // Pending import lives across the preview → confirm click. Dropped on
+    // cancel, successful restore, or a newer import plan.
+    let pending_import: Rc<RefCell<Option<ImportPlan>>> = Rc::new(RefCell::new(None));
+
+    // --- Open existing (adopt, zero writes). Also bound to the path "..." button. ---
     let weak = window.as_weak();
     let browse_config = Rc::clone(&active_config);
     let browse_store_path = options.location_store_path.clone();
     let browse_model = Rc::clone(&model);
     let browse_repository = Rc::clone(&repository);
-    let templates = options.templates;
     window.on_browse_config(move || {
         let current = browse_config.borrow().clone();
         let Some(selected) = rfd::FileDialog::new().set_directory(&current).pick_folder() else {
@@ -293,53 +298,225 @@ fn bind_location(
         };
         window.set_status_message("Checking the selected folder...".into());
 
-        // The folder's own contents decide between generating and adopting, so
-        // the user never has to declare that intent up front. Adopting writes
-        // nothing at all, which is what makes it safe to do without a
-        // confirmation step.
-        let result = AdoptService::plan(&current, &selected).and_then(|plan| match plan {
-            ConfigFolderPlan::Scaffold(plan) => {
-                ScaffoldService::execute(&plan, &templates, &EspansoConfigValidator)?;
-                ConfigLocationStore::new(browse_store_path.clone())
-                    .save_atomic(&plan.destination)?;
-                Ok((
-                    plan.destination,
-                    "Default configuration created; switched over. Restart Espanso.".to_string(),
-                ))
-            }
-            ConfigFolderPlan::Adopt(plan) => {
-                ConfigLocationStore::new(browse_store_path.clone())
-                    .save_atomic(&plan.destination)?;
-                let message = adopted_message(&plan);
-                Ok((plan.destination, message))
-            }
+        let result = AdoptService::plan(&current, &selected).and_then(|plan| {
+            ConfigLocationStore::new(browse_store_path.clone()).save_atomic(&plan.destination)?;
+            let message = adopted_message(&plan);
+            Ok((plan.destination, message))
         });
 
         match result {
             Ok((destination, message)) => {
-                window.set_config_path(path_text(&destination));
-                // The migration panel targets the same directory picker; leaving
-                // it populated would offer to copy into a directory that is no
-                // longer empty.
-                window.set_selected_path(SharedString::default());
-                window.set_migration_summary(SharedString::default());
-                window.set_migration_ready(false);
-                window.set_error_message(SharedString::default());
-                window.set_status_message(message.into());
-
-                *browse_repository.borrow_mut() = UiMatchRepository::new(&destination);
-                browse_config.borrow_mut().clone_from(&destination);
-                reload_matches(&window, &browse_model, &browse_repository, &destination);
+                apply_active_directory(
+                    &window,
+                    &browse_config,
+                    &browse_repository,
+                    &browse_model,
+                    &destination,
+                    &message,
+                );
             }
             Err(error) => {
                 window.set_status_message("Ready".into());
                 window.set_error_message(
-                    format!("Cannot use that directory: {error}; nothing was written.").into(),
+                    format!("Cannot open that directory: {error}; nothing was written.").into(),
                 );
             }
         }
     });
 
+    // --- Create new configuration in an empty folder. ---
+    let weak = window.as_weak();
+    let create_config = Rc::clone(&active_config);
+    let create_store_path = options.location_store_path.clone();
+    let create_model = Rc::clone(&model);
+    let create_repository = Rc::clone(&repository);
+    let templates = options.templates;
+    window.on_create_config(move || {
+        let current = create_config.borrow().clone();
+        let Some(selected) = rfd::FileDialog::new().set_directory(&current).pick_folder() else {
+            return;
+        };
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        window.set_status_message("Creating a default configuration...".into());
+
+        let result = ScaffoldService::preflight(&current, &selected).and_then(|plan| {
+            ScaffoldService::execute(&plan, &templates, &EspansoConfigValidator)?;
+            ConfigLocationStore::new(create_store_path.clone()).save_atomic(&plan.destination)?;
+            Ok(plan.destination)
+        });
+
+        match result {
+            Ok(destination) => {
+                apply_active_directory(
+                    &window,
+                    &create_config,
+                    &create_repository,
+                    &create_model,
+                    &destination,
+                    "Default configuration created; switched over. Restart Espanso.",
+                );
+            }
+            Err(error) => {
+                window.set_status_message("Ready".into());
+                window.set_error_message(
+                    format!("Cannot create configuration: {error}; nothing was written.").into(),
+                );
+            }
+        }
+    });
+
+    // --- Export backup (read-only on the active config). ---
+    let weak = window.as_weak();
+    let export_config = Rc::clone(&active_config);
+    window.on_export_backup(move || {
+        let current = export_config.borrow().clone();
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        let Some(archive) = rfd::FileDialog::new()
+            .set_file_name(BackupService::default_export_name())
+            .add_filter("Espanso backup", &["zip"])
+            .save_file()
+        else {
+            return;
+        };
+        window.set_status_message("Exporting backup...".into());
+        match BackupService::export(&current, &archive) {
+            Ok(summary) => {
+                window.set_error_message(SharedString::default());
+                window.set_status_message(
+                    format!(
+                        "Backup exported: {} file(s) ({} bytes) → {}.",
+                        summary.file_count,
+                        summary.byte_count,
+                        summary.archive.display()
+                    )
+                    .into(),
+                );
+            }
+            Err(error) => {
+                window.set_status_message("Ready".into());
+                window.set_error_message(
+                    format!("Export failed: {error}; the configuration was not changed.").into(),
+                );
+            }
+        }
+    });
+
+    // --- Import backup: pick archive + empty destination, then preview. ---
+    let weak = window.as_weak();
+    let import_pending = Rc::clone(&pending_import);
+    window.on_import_backup(move || {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        let Some(archive) = rfd::FileDialog::new()
+            .add_filter("Espanso backup", &["zip"])
+            .pick_file()
+        else {
+            return;
+        };
+        let Some(destination) = rfd::FileDialog::new()
+            .set_title("Choose an empty folder to restore into")
+            .pick_folder()
+        else {
+            return;
+        };
+        window.set_status_message("Checking the backup...".into());
+        // Drop any previous staged import before planning a new one.
+        if let Some(previous) = import_pending.borrow_mut().take() {
+            BackupService::discard_import(&previous);
+        }
+        match BackupService::plan_import(&archive, &destination) {
+            Ok(plan) => {
+                let summary = format!(
+                    "Ready to restore {} config file(s) and {} match(es) into {}. Nothing has been written yet.",
+                    plan.adopt.config_count,
+                    plan.adopt.match_count,
+                    plan.destination.display()
+                );
+                window.set_import_summary(summary.into());
+                window.set_import_ready(true);
+                window.set_error_message(SharedString::default());
+                window.set_status_message("Backup checked; confirm to restore.".into());
+                *import_pending.borrow_mut() = Some(plan);
+            }
+            Err(error) => {
+                window.set_import_summary(SharedString::default());
+                window.set_import_ready(false);
+                window.set_status_message("Ready".into());
+                window.set_error_message(
+                    format!("Cannot import that backup: {error}; nothing was written.").into(),
+                );
+            }
+        }
+    });
+
+    let weak = window.as_weak();
+    let confirm_pending = Rc::clone(&pending_import);
+    let confirm_config = Rc::clone(&active_config);
+    let confirm_model = Rc::clone(&model);
+    let confirm_repository = Rc::clone(&repository);
+    let confirm_store_path = options.location_store_path.clone();
+    window.on_confirm_import(move || {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        let Some(plan) = confirm_pending.borrow_mut().take() else {
+            window.set_error_message("No backup is ready to restore.".into());
+            return;
+        };
+        window.set_import_ready(false);
+        window.set_status_message("Restoring backup...".into());
+        let destination = plan.destination.clone();
+        let result = BackupService::execute_import(&plan, &EspansoConfigValidator).and_then(|()| {
+            ConfigLocationStore::new(confirm_store_path.clone()).save_atomic(&destination)?;
+            Ok(plan.adopt.clone())
+        });
+        match result {
+            Ok(adopt) => {
+                window.set_import_summary(SharedString::default());
+                let message = format!(
+                    "Restored {} config file(s), {} match(es) to {}. Restart Espanso.",
+                    adopt.config_count,
+                    adopt.match_count,
+                    destination.display()
+                );
+                apply_active_directory(
+                    &window,
+                    &confirm_config,
+                    &confirm_repository,
+                    &confirm_model,
+                    &destination,
+                    &message,
+                );
+            }
+            Err(error) => {
+                BackupService::discard_import(&plan);
+                window.set_import_summary(SharedString::default());
+                window.set_status_message("Ready".into());
+                window.set_error_message(format!("Import failed: {error}").into());
+            }
+        }
+    });
+
+    let weak = window.as_weak();
+    let cancel_pending = Rc::clone(&pending_import);
+    window.on_cancel_import(move || {
+        if let Some(plan) = cancel_pending.borrow_mut().take() {
+            BackupService::discard_import(&plan);
+        }
+        if let Some(window) = weak.upgrade() {
+            window.set_import_summary(SharedString::default());
+            window.set_import_ready(false);
+            window.set_status_message("Import cancelled.".into());
+            window.set_error_message(SharedString::default());
+        }
+    });
+
+    // --- Advanced: copy current tree to another empty folder. ---
     let weak = window.as_weak();
     let choose_config = Rc::clone(&active_config);
     window.on_choose_folder(move || {
@@ -411,6 +588,31 @@ fn bind_location(
             }
         }
     });
+}
+
+/// Switches the live Settings state over to `destination` after a successful
+/// Open / Create / Import. Clears the advanced copy panel so it cannot target
+/// a directory that is no longer empty.
+fn apply_active_directory(
+    window: &crate::SettingsWindow,
+    active_config: &Rc<RefCell<PathBuf>>,
+    repository: &Rc<RefCell<UiMatchRepository>>,
+    model: &Rc<RefCell<SettingsModel>>,
+    destination: &Path,
+    message: &str,
+) {
+    window.set_config_path(path_text(destination));
+    window.set_selected_path(SharedString::default());
+    window.set_migration_summary(SharedString::default());
+    window.set_migration_ready(false);
+    window.set_import_summary(SharedString::default());
+    window.set_import_ready(false);
+    window.set_error_message(SharedString::default());
+    window.set_status_message(message.into());
+
+    *repository.borrow_mut() = UiMatchRepository::new(destination);
+    *active_config.borrow_mut() = destination.to_path_buf();
+    reload_matches(window, model, repository, destination);
 }
 
 fn adopted_message(plan: &AdoptPlan) -> String {

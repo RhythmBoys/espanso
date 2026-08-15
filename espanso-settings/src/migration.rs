@@ -62,7 +62,9 @@ impl MigrationService {
                 bail!("destination is not a directory");
             }
             if fs::read_dir(&destination)?.next().is_some() {
-                bail!("destination must be empty");
+                bail!(
+                    "destination must be empty; to open an existing configuration use “Open existing configuration…”, or restore a backup with “Import backup…”"
+                );
             }
         }
 
