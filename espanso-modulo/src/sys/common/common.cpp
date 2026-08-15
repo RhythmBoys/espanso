@@ -19,6 +19,8 @@
 
 #include "common.h"
 
+#include <wx/fontenum.h>
+
 #ifdef __WXMSW__
 #include <windows.h>
 #endif
@@ -80,3 +82,39 @@ void SetupWindowStyle(wxFrame *frame) {
     SetWindowStyles((NSWindow *)frame->MacGetTopLevelWindowRef());
 #endif
 }
+
+wxString PreferredUiFontFace() {
+    // wxHtmlListBox only honours a single face name reliably; pick the first
+    // installed family that typically carries CJK glyphs so Chinese is not □.
+#ifdef __WXMSW__
+    static const wxChar *const candidates[] = {
+        wxT("Microsoft YaHei UI"),
+        wxT("Microsoft YaHei"),
+        wxT("微软雅黑"),
+        wxT("SimSun"),
+        wxT("宋体"),
+        wxT("Segoe UI"),
+    };
+#elif defined(__WXOSX__)
+    static const wxChar *const candidates[] = {
+        wxT("PingFang SC"),
+        wxT("Hiragino Sans GB"),
+        wxT("Heiti SC"),
+        wxT("Helvetica"),
+    };
+#else
+    static const wxChar *const candidates[] = {
+        wxT("Noto Sans CJK SC"),
+        wxT("Noto Sans SC"),
+        wxT("WenQuanYi Micro Hei"),
+        wxT("Sans"),
+    };
+#endif
+    for (const wxChar *name : candidates) {
+        if (wxFontEnumerator::IsValidFacename(name)) {
+            return wxString(name);
+        }
+    }
+    return wxString(candidates[0]);
+}
+

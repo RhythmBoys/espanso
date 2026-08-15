@@ -18,6 +18,11 @@ export component SettingsWindow inherits Window {
     min-width: 820px;
     min-height: 560px;
     background: #f5f7fb;
+    // Explicit CJK-capable face: Slint's Latin-first default often draws Chinese
+    // as empty boxes (□) on Windows when only Segoe UI is selected.
+    // "Microsoft YaHei" is present on Chinese Windows and language-pack installs.
+    default-font-family: "Microsoft YaHei";
+    default-font-size: 14px;
 
     in property <string> config-path;
     in property <string> source-label;

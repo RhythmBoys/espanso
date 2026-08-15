@@ -171,6 +171,11 @@ void FormFrame::AddComponent(wxPanel *parent, wxBoxSizer *sizer,
                                       wxString::FromUTF8(labelMeta->text),
                                       wxDefaultPosition, wxDefaultSize, style);
 
+        {
+            wxFont font = label->GetFont();
+            font.SetFaceName(PreferredUiFontFace());
+            label->SetFont(font);
+        }
         label->Wrap(this->GetClientSize().GetWidth());
         control = label;
         fields.push_back(label);
@@ -187,6 +192,11 @@ void FormFrame::AddComponent(wxPanel *parent, wxBoxSizer *sizer,
         auto textControl = new wxTextCtrl(
             parent, NewControlId(), wxString::FromUTF8(textMeta->defaultText),
             wxDefaultPosition, wxDefaultSize, style);
+        {
+            wxFont font = textControl->GetFont();
+            font.SetFaceName(PreferredUiFontFace());
+            textControl->SetFont(font);
+        }
 
         if (textMeta->multiline) {
             textControl->SetMinSize(

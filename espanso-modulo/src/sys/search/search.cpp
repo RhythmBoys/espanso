@@ -146,11 +146,14 @@ wxString ResultListBox::OnGetItem(size_t n) const {
     wxString escapedLabel = EscapeHtml(wxItems[n]);
     wxString escapedTrigger = EscapeHtml(wxTriggers[n]);
 
+    // wxHtmlListBox uses a limited HTML engine with weak font fallback; without
+    // an explicit CJK-capable face, Chinese labels render as empty boxes (□).
+    wxString face = PreferredUiFontFace();
     wxString result = wxString::Format(
-        wxT("<font color='%s'><table width='100%%'><tr><td>%s</td><td "
+        wxT("<font face='%s' color='%s'><table width='100%%'><tr><td>%s</td><td "
             "align='right'><b>%s</b> <font color='#636e72'> "
             "%s</font></td></tr></table></font>"),
-        textColor, escapedLabel, escapedTrigger, shortcut);
+        face, textColor, escapedLabel, escapedTrigger, shortcut);
 
     return result;
 }
@@ -241,6 +244,8 @@ SearchFrame::SearchFrame(const wxString &title, const wxPoint &pos,
         new wxTextCtrl(panel, textId, "", wxDefaultPosition, wxDefaultSize);
     wxFont font = searchBar->GetFont();
     font.SetPointSize(SEARCH_BAR_FONT_SIZE);
+    // Prefer a face that has CJK glyphs so typed/shown Chinese is not tofu.
+    font.SetFaceName(PreferredUiFontFace());
     searchBar->SetFont(font);
     topBox->Add(searchBar, 1, wxEXPAND | wxALL, 10);
 

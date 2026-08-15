@@ -82,14 +82,15 @@ impl Executor for TextInjectExecutor<'_> {
                 clipboard_threshold,
             } = active_mode
             {
-                if inject_event.text.chars().count() > clipboard_threshold {
+                // Prefer clipboard for long expansions (speed) and for any
+                // non-ASCII text. Keyboard Unicode injection (Windows
+                // KEYEVENTF_UNICODE / X11) is widely mishandled for CJK and
+                // other multi-byte scripts, producing mojibake in many apps.
+                // Linux already took this path; Windows and macOS need it too.
+                if inject_event.text.chars().count() > clipboard_threshold
+                    || !inject_event.text.is_ascii()
+                {
                     self.clipboard_injector
-                } else if cfg!(target_os = "linux") {
-                    if inject_event.text.is_ascii() {
-                        self.event_injector
-                    } else {
-                        self.clipboard_injector
-                    }
                 } else {
                     self.event_injector
                 }
