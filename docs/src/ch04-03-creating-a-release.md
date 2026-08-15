@@ -69,11 +69,32 @@ The generated release notes state all of this.
 
 ## Signed release (`create-release-draft.yml`)
 
-The upstream workflow, kept unchanged. Use it when you have the SignPath
-credentials, since it is the only path that produces signed Windows binaries.
+The upstream workflow. Use it when you have signing credentials.
 
 It is `workflow_dispatch` only and must be triggered from `dev`. It takes its
 version from `espanso/Cargo.toml` rather than from a tag, requires the tag to
-already exist (`--verify-tag`), publishes as a prerelease immediately, and does
-not upload the macOS artifact. Signing needs `secrets.SIGNPATH_API_TOKEN` and a
-SignPath organization — without them the Windows job fails.
+already exist (`--verify-tag`), and publishes as a prerelease.
+
+### Step by step
+
+1) Run the `create-release-draft.yml` workflow. The CI builds, codesigns and
+notarizes the macOS DMG automatically, using Auca's Apple Developer ID
+Application certificate (individual enrollment — espanso doesn't have a
+registered legal entity, so an org-owned Apple Developer account isn't an
+option) stored in the repo's GitHub Actions secrets (`MACOS_CERTIFICATE`,
+`MACOS_CERTIFICATE_PWD`, `MACOS_CERTIFICATE_NAME`, `MACOS_CI_KEYCHAIN_PWD`,
+`APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`). As with
+Federico's certificate before it, this ties signing to one maintainer's
+Apple ID; if Auca's certificate ever expires, is revoked, or he steps away,
+someone will need to re-enroll and refresh these secrets. If the secrets are
+ever missing or stale, the `macos` job step "Codesign app bundle" will fail
+and the DMG will need to be signed manually as a fallback.
+
+Windows signing needs `secrets.SIGNPATH_API_TOKEN` and a SignPath organization
+— without them the Windows job fails.
+
+2) Wait until the workflow finishes...
+
+3) Update the description and hit publish!
+
+4) Share the news — make an announcement in the `espanso` discord.
