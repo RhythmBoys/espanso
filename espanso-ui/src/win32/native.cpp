@@ -309,8 +309,29 @@ void ui_update_tray_icon(void *window, int32_t index) {
 
 // Menu related methods
 
+// Rust serializes menu labels as UTF-8 JSON. `mbstowcs` uses the process ANSI
+// code page (often CP936 on Chinese Windows), so multi-byte UTF-8 Chinese is
+// decoded as the wrong charset and shows as mojibake. Always convert with
+// CP_UTF8 so CJK labels render correctly.
+static std::wstring utf8_to_wide(const std::string &utf8) {
+    if (utf8.empty()) {
+        return std::wstring();
+    }
+
+    int needed = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(),
+                                     static_cast<int>(utf8.size()), NULL, 0);
+    if (needed <= 0) {
+        return std::wstring();
+    }
+
+    std::wstring wide(static_cast<size_t>(needed), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), static_cast<int>(utf8.size()),
+                        &wide[0], needed);
+    return wide;
+}
+
 void _insert_separator_menu(HMENU parent) {
-    InsertMenu(parent, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+    InsertMenuW(parent, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 }
 
 void _insert_single_menu(HMENU parent, json item) {
@@ -319,13 +340,10 @@ void _insert_single_menu(HMENU parent, json item) {
     }
     std::string label = item["label"];
     uint32_t raw_id = item["id"];
+    std::wstring wide_label = utf8_to_wide(label);
 
-    // Convert to wide chars
-    std::wstring wide_label(label.length(), L'#');
-    mbstowcs(&wide_label[0], label.c_str(), label.length());
-
-    InsertMenu(parent, -1, MF_BYPOSITION | MF_STRING, raw_id,
-               wide_label.c_str());
+    InsertMenuW(parent, -1, MF_BYPOSITION | MF_STRING, raw_id,
+                wide_label.c_str());
 }
 
 void _insert_sub_menu(HMENU parent, json items) {
@@ -337,13 +355,10 @@ void _insert_sub_menu(HMENU parent, json items) {
         } else if (item["type"] == "sub") {
             HMENU subMenu = CreatePopupMenu();
             std::string label = item["label"];
+            std::wstring wide_label = utf8_to_wide(label);
 
-            // Convert to wide chars
-            std::wstring wide_label(label.length(), L'#');
-            mbstowcs(&wide_label[0], label.c_str(), label.length());
-
-            InsertMenu(parent, -1, MF_BYPOSITION | MF_POPUP, (UINT_PTR)subMenu,
-                       wide_label.c_str());
+            InsertMenuW(parent, -1, MF_BYPOSITION | MF_POPUP, (UINT_PTR)subMenu,
+                        wide_label.c_str());
             _insert_sub_menu(subMenu, item["items"]);
         }
     }
