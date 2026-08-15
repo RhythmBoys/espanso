@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
 
-use espanso_settings::{AdoptService, ConfigFolderPlan};
+use espanso_settings::AdoptService;
 use tempdir::TempDir;
 
 /// Writes a minimal but genuinely loadable Espanso configuration.
@@ -12,23 +12,29 @@ fn write_config(root: &Path, base_yml: &str) {
 }
 
 #[test]
-fn empty_and_missing_directories_are_planned_as_scaffold() {
+fn empty_and_missing_directories_are_rejected_with_create_hint() {
     let root = TempDir::new("settings-adopt-scaffold").unwrap();
     let current = root.path().join("current");
     write_config(&current, "matches: []\n");
 
     let missing = root.path().join("missing");
-    assert!(matches!(
-        AdoptService::plan(&current, &missing).unwrap(),
-        ConfigFolderPlan::Scaffold(_)
-    ));
+    let error = AdoptService::plan(&current, &missing)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("Create new"),
+        "empty/missing must point at Create new, got: {error}"
+    );
 
     let empty = root.path().join("empty");
     fs::create_dir(&empty).unwrap();
-    assert!(matches!(
-        AdoptService::plan(&current, &empty).unwrap(),
-        ConfigFolderPlan::Scaffold(_)
-    ));
+    let error = AdoptService::plan(&current, &empty)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("Create new"),
+        "empty must point at Create new, got: {error}"
+    );
 }
 
 #[test]
@@ -43,9 +49,7 @@ fn an_existing_configuration_is_adopted_and_counted() {
         "matches:\n  - trigger: \":hi\"\n    replace: \"Hello\"\n  - trigger: \":bye\"\n    replace: \"Bye\"\n",
     );
 
-    let ConfigFolderPlan::Adopt(plan) = AdoptService::plan(&current, &existing).unwrap() else {
-        panic!("an existing configuration must be adopted, not scaffolded");
-    };
+    let plan = AdoptService::plan(&current, &existing).unwrap();
     assert_eq!(plan.match_count, 2);
     assert_eq!(plan.config_count, 1);
     assert!(plan.warning_files.is_empty());
@@ -99,6 +103,10 @@ fn non_empty_directories_without_a_config_folder_are_rejected() {
     assert!(
         error.contains("config"),
         "message must name what is missing"
+    );
+    assert!(
+        error.contains("Import backup") || error.contains("Create new"),
+        "message should point at an alternative action, got: {error}"
     );
 }
 

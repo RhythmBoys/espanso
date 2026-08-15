@@ -34,7 +34,21 @@ fn preflight_rejects_non_empty_files_and_overlapping_directories() {
     let non_empty = root.path().join("non-empty");
     fs::create_dir(&non_empty).unwrap();
     fs::write(non_empty.join("keep.txt"), "keep").unwrap();
-    assert!(ScaffoldService::preflight(&current, &non_empty).is_err());
+    let error = ScaffoldService::preflight(&current, &non_empty)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("not empty"), "got: {error}");
+
+    let existing = root.path().join("existing-espanso");
+    fs::create_dir_all(existing.join("config")).unwrap();
+    fs::write(existing.join("config/default.yml"), "#\n").unwrap();
+    let error = ScaffoldService::preflight(&current, &existing)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("Open existing"),
+        "existing config should point at Open existing, got: {error}"
+    );
 
     let file = root.path().join("a-file");
     fs::write(&file, "not a directory").unwrap();

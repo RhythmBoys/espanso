@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{bail, Context, Result};
 
-use crate::{migration::canonicalize_destination, ScaffoldPlan, ScaffoldService};
+use crate::migration::canonicalize_destination;
 
 /// An existing Espanso configuration directory that Settings can point at.
 ///
@@ -22,23 +22,15 @@ pub struct AdoptPlan {
     pub warning_files: Vec<PathBuf>,
 }
 
-/// What Settings intends to do with the directory the user picked.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ConfigFolderPlan {
-    /// Nothing there yet: generate the default configuration.
-    Scaffold(ScaffoldPlan),
-    /// Already an Espanso configuration: switch to it as-is.
-    Adopt(AdoptPlan),
-}
-
 pub struct AdoptService;
 
 impl AdoptService {
-    /// Classifies `selected` and returns the action it warrants.
+    /// Plans opening `selected` as the active configuration directory.
     ///
-    /// The directory's own contents decide between generating and adopting, so
-    /// the user never has to declare that intent up front.
-    pub fn plan(current_config: &Path, selected: &Path) -> Result<ConfigFolderPlan> {
+    /// Open never scaffolds: an empty folder is rejected with a pointer to
+    /// “Create new configuration…”. Only a directory Espanso can load is
+    /// accepted, and nothing is written to it.
+    pub fn plan(current_config: &Path, selected: &Path) -> Result<AdoptPlan> {
         if !selected.is_absolute() {
             bail!("the selected directory must be an absolute path");
         }
@@ -48,8 +40,9 @@ impl AdoptService {
 
         let is_empty = !selected.exists() || fs::read_dir(selected)?.next().is_none();
         if is_empty {
-            return ScaffoldService::preflight(current_config, selected)
-                .map(ConfigFolderPlan::Scaffold);
+            bail!(
+                "the selected directory is empty; use “Create new configuration…” to generate a default configuration there"
+            );
         }
 
         let destination = canonicalize_destination(selected)?;
@@ -57,11 +50,11 @@ impl AdoptService {
 
         if !destination.join("config").is_dir() {
             bail!(
-                "the selected directory is not empty and does not contain a 'config' folder, so it is not an Espanso configuration; pick the folder that holds 'config' and 'match', or an empty folder to start from scratch"
+                "the selected directory is not empty and does not contain a 'config' folder, so it is not an Espanso configuration; pick the folder that holds 'config' and 'match', use “Import backup…” for a portable archive, or “Create new configuration…” with an empty folder"
             );
         }
 
-        Self::inspect(&destination).map(ConfigFolderPlan::Adopt)
+        Self::inspect(&destination)
     }
 
     /// Loads `root` with Espanso's own loader to confirm it is usable.

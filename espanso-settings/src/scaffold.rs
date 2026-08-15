@@ -39,8 +39,13 @@ impl ScaffoldService {
                 bail!("the selected path is not a directory");
             }
             if fs::read_dir(&destination)?.next().is_some() {
+                if destination.join("config").is_dir() {
+                    bail!(
+                        "this folder already looks like an Espanso configuration; use “Open existing configuration…” instead"
+                    );
+                }
                 bail!(
-                    "the selected directory is not empty; create a new empty folder and select it"
+                    "the selected directory is not empty; create a new empty folder and select it, or use “Open existing configuration…” / “Import backup…”"
                 );
             }
         }

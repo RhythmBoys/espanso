@@ -31,6 +31,7 @@ slint = { version = "=1.17.1", default-features = false, features = [
 ], optional = true }
 thiserror.workspace = true
 walkdir.workspace = true
+zip = { version = "0.5.13", default-features = false, features = ["deflate"] }
 
 [build-dependencies]
 slint-build = "=1.17.1"

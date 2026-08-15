@@ -1973,6 +1973,7 @@ dependencies = [
  "tempdir",
  "thiserror 1.0.56",
  "walkdir",
+ "zip",
 ]
 
 [[package]]

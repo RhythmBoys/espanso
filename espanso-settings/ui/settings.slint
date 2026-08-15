@@ -26,6 +26,9 @@ export component SettingsWindow inherits Window {
     in-out property <string> selected-path;
     in-out property <string> migration-summary;
     in-out property <bool> migration-ready: false;
+    in-out property <string> import-summary;
+    in-out property <bool> import-ready: false;
+    in-out property <bool> advanced-open: false;
     in-out property <string> status-message: "Ready";
     in-out property <string> error-message;
     in-out property <bool> confirm-discard-visible: false;
@@ -40,10 +43,18 @@ export component SettingsWindow inherits Window {
     callback confirm-discard();
     callback cancel-discard();
     callback draft-changed();
+    // Open existing configuration (adopt, zero writes).
     callback browse-config();
+    // Create new configuration in an empty folder (scaffold).
+    callback create-config();
+    // Advanced: copy current tree to another empty folder.
     callback choose-folder();
     callback migrate();
     callback open-config();
+    callback export-backup();
+    callback import-backup();
+    callback confirm-import();
+    callback cancel-import();
     callback new-match();
     callback select-match(string);
     callback save-match();
@@ -132,7 +143,7 @@ export component SettingsWindow inherits Window {
                     spacing: 12px;
                     Text { text: "Configuration directory"; font-size: 20px; font-weight: 600; color: #172033; }
                     Text {
-                        text: "Choosing a new directory runs a preflight check first, then copies, validates and switches to it. The old directory is left in place.";
+                        text: "Open points at a folder that already has config/ and match/. Create needs an empty folder. Export and Import use a portable backup file for migration between machines.";
                         color: #526078;
                         wrap: word-wrap;
                     }
@@ -149,32 +160,77 @@ export component SettingsWindow inherits Window {
                             clicked => { root.browse-config(); }
                         }
                     }
-                    Text {
-                        text: "Use ... to choose a configuration folder. An existing Espanso configuration is adopted as-is, without changing a single file in it; an empty folder gets a fresh default configuration generated in it.";
-                        color: #526078;
-                        wrap: word-wrap;
+                    HorizontalBox {
+                        spacing: 8px;
+                        Button {
+                            text: "Open existing configuration...";
+                            enabled: root.can-change-location;
+                            clicked => { root.browse-config(); }
+                        }
+                        Button {
+                            text: "Create new configuration...";
+                            enabled: root.can-change-location;
+                            clicked => { root.create-config(); }
+                        }
                     }
                     HorizontalBox {
                         spacing: 8px;
-                        Button { text: "Open current directory"; clicked => { root.open-config(); } }
                         Button {
-                            text: "Choose new directory...";
-                            enabled: root.can-change-location;
-                            clicked => { root.choose-folder(); }
+                            text: "Export backup...";
+                            clicked => { root.export-backup(); }
                         }
+                        Button {
+                            text: "Import backup...";
+                            enabled: root.can-change-location;
+                            clicked => { root.import-backup(); }
+                        }
+                        Button { text: "Open current directory"; clicked => { root.open-config(); } }
                     }
                     if !root.can-change-location: Text {
                         text: "The path is currently overridden by the command line or an environment variable, so it cannot be changed permanently.";
                         color: #a15c00;
                     }
-                    if root.selected-path != "": VerticalBox {
+                    if root.import-summary != "": VerticalBox {
                         spacing: 8px;
-                        Text { text: "Target directory: " + root.selected-path; color: #172033; }
-                        Text { text: root.migration-summary; color: #526078; wrap: word-wrap; }
+                        Text { text: root.import-summary; color: #172033; wrap: word-wrap; }
+                        HorizontalBox {
+                            spacing: 8px;
+                            Button {
+                                text: "Restore and switch";
+                                enabled: root.import-ready;
+                                clicked => { root.confirm-import(); }
+                            }
+                            Button {
+                                text: "Cancel import";
+                                clicked => { root.cancel-import(); }
+                            }
+                        }
+                    }
+                    Button {
+                        text: root.advanced-open ? "Hide advanced" : "Show advanced";
+                        clicked => { root.advanced-open = !root.advanced-open; }
+                    }
+                    if root.advanced-open: VerticalBox {
+                        spacing: 8px;
+                        Text {
+                            text: "Copy the current configuration into another empty folder, then switch to it. The old directory is left in place. Prefer Export/Import for backups and machine-to-machine moves.";
+                            color: #526078;
+                            wrap: word-wrap;
+                        }
                         Button {
-                            text: "Copy and switch";
-                            enabled: root.migration-ready;
-                            clicked => { root.migrate(); }
+                            text: "Copy to another empty folder...";
+                            enabled: root.can-change-location;
+                            clicked => { root.choose-folder(); }
+                        }
+                        if root.selected-path != "": VerticalBox {
+                            spacing: 8px;
+                            Text { text: "Target directory: " + root.selected-path; color: #172033; }
+                            Text { text: root.migration-summary; color: #526078; wrap: word-wrap; }
+                            Button {
+                                text: "Copy and switch";
+                                enabled: root.migration-ready;
+                                clicked => { root.migrate(); }
+                            }
                         }
                     }
                     Rectangle { vertical-stretch: 1; }
