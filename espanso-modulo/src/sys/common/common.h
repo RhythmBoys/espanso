@@ -33,4 +33,9 @@ void Activate(wxFrame *frame);
 
 void SetupWindowStyle(wxFrame *frame);
 
+// Fonts that carry CJK glyphs on stock Windows / macOS / common Linux installs.
+// Used by HTML markup (wxHtmlListBox has weak font fallback) and by plain
+// controls when the default GUI face lacks Chinese coverage.
+wxString PreferredUiFontFace();
+
 #endif

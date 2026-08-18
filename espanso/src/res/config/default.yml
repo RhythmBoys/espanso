@@ -37,6 +37,8 @@
 
 # Because injecting long texts char-by-char is a slow operation, espanso automatically
 # uses the clipboard if the text is longer than 'clipboard_threshold' characters.
+# With the Auto backend, non-ASCII text (e.g. Chinese) also uses the clipboard,
+# because keyboard Unicode injection is unreliable for those scripts in many apps.
 # clipboard_threshold: 100
 
 # --- Regex Buffer Size
